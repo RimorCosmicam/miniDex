@@ -73,6 +73,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _showMacroEditor = MutableStateFlow(false)
     val showMacroEditor: StateFlow<Boolean> = _showMacroEditor.asStateFlow()
 
+    private val _showSettings = MutableStateFlow(false)
+    val showSettings: StateFlow<Boolean> = _showSettings.asStateFlow()
+
     private val targetDisplayId: Int
         get() {
             val prefManual = userPreferences.value.manualDisplayId
@@ -124,6 +127,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleAppMode() {
         _currentMode.value = if (_currentMode.value == AppMode.KEYBOARD) AppMode.TOUCHPAD else AppMode.KEYBOARD
+        hapticManager.performHaptic(userPreferences.value.hapticStrength)
+    }
+
+    fun setSettingsVisible(visible: Boolean) {
+        _showSettings.value = visible
+        hapticManager.performHaptic(userPreferences.value.hapticStrength)
+    }
+
+    fun handleSwipeWord(word: String) {
+        if (word.isBlank()) return
+        activeBackend.value.sendText("$word ", targetDisplayId)
         hapticManager.performHaptic(userPreferences.value.hapticStrength)
     }
 

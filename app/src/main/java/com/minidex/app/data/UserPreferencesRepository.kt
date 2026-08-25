@@ -36,6 +36,11 @@ class UserPreferencesRepository(private val context: Context) {
         val SCROLL_SENSITIVITY = floatPreferencesKey("scroll_sensitivity")
         val NATURAL_SCROLLING = booleanPreferencesKey("natural_scrolling")
         val EDGE_SCROLL_ON_RIGHT = booleanPreferencesKey("edge_scroll_on_right")
+        val BACKGROUND_GIF_URI = stringPreferencesKey("background_gif_uri")
+        val BACKGROUND_GIF_SCALE = floatPreferencesKey("background_gif_scale")
+        val BACKGROUND_GIF_OFFSET_X = floatPreferencesKey("background_gif_offset_x")
+        val BACKGROUND_GIF_OFFSET_Y = floatPreferencesKey("background_gif_offset_y")
+        val BACKGROUND_GIF_OPACITY = floatPreferencesKey("background_gif_opacity")
         val TAP_TO_CLICK = booleanPreferencesKey("tap_to_click")
         val CURSOR_MODE = stringPreferencesKey("cursor_mode")
         val PREFERRED_BACKEND = stringPreferencesKey("preferred_backend")
@@ -75,6 +80,11 @@ class UserPreferencesRepository(private val context: Context) {
             scrollSensitivity = prefs[Keys.SCROLL_SENSITIVITY] ?: 1.0f,
             naturalScrolling = prefs[Keys.NATURAL_SCROLLING] ?: false,
             edgeScrollOnRight = prefs[Keys.EDGE_SCROLL_ON_RIGHT] ?: false,
+            backgroundGifUri = prefs[Keys.BACKGROUND_GIF_URI] ?: "",
+            backgroundGifScale = prefs[Keys.BACKGROUND_GIF_SCALE] ?: 1f,
+            backgroundGifOffsetX = prefs[Keys.BACKGROUND_GIF_OFFSET_X] ?: 0f,
+            backgroundGifOffsetY = prefs[Keys.BACKGROUND_GIF_OFFSET_Y] ?: 0f,
+            backgroundGifOpacity = prefs[Keys.BACKGROUND_GIF_OPACITY] ?: 0.55f,
             tapToClick = prefs[Keys.TAP_TO_CLICK] ?: true,
             cursorMode = try {
                 CursorMode.valueOf(prefs[Keys.CURSOR_MODE] ?: CursorMode.AUTO_NATIVE.name)
@@ -120,6 +130,11 @@ class UserPreferencesRepository(private val context: Context) {
                 scrollSensitivity = prefs[Keys.SCROLL_SENSITIVITY] ?: 1.0f,
                 naturalScrolling = prefs[Keys.NATURAL_SCROLLING] ?: false,
                 edgeScrollOnRight = prefs[Keys.EDGE_SCROLL_ON_RIGHT] ?: false,
+                backgroundGifUri = prefs[Keys.BACKGROUND_GIF_URI] ?: "",
+                backgroundGifScale = prefs[Keys.BACKGROUND_GIF_SCALE] ?: 1f,
+                backgroundGifOffsetX = prefs[Keys.BACKGROUND_GIF_OFFSET_X] ?: 0f,
+                backgroundGifOffsetY = prefs[Keys.BACKGROUND_GIF_OFFSET_Y] ?: 0f,
+                backgroundGifOpacity = prefs[Keys.BACKGROUND_GIF_OPACITY] ?: 0.55f,
                 tapToClick = prefs[Keys.TAP_TO_CLICK] ?: true,
                 cursorMode = try {
                     CursorMode.valueOf(prefs[Keys.CURSOR_MODE] ?: CursorMode.AUTO_NATIVE.name)
@@ -146,6 +161,11 @@ class UserPreferencesRepository(private val context: Context) {
             prefs[Keys.SCROLL_SENSITIVITY] = updated.scrollSensitivity
             prefs[Keys.NATURAL_SCROLLING] = updated.naturalScrolling
             prefs[Keys.EDGE_SCROLL_ON_RIGHT] = updated.edgeScrollOnRight
+            prefs[Keys.BACKGROUND_GIF_URI] = updated.backgroundGifUri
+            prefs[Keys.BACKGROUND_GIF_SCALE] = updated.backgroundGifScale
+            prefs[Keys.BACKGROUND_GIF_OFFSET_X] = updated.backgroundGifOffsetX
+            prefs[Keys.BACKGROUND_GIF_OFFSET_Y] = updated.backgroundGifOffsetY
+            prefs[Keys.BACKGROUND_GIF_OPACITY] = updated.backgroundGifOpacity
             prefs[Keys.TAP_TO_CLICK] = updated.tapToClick
             prefs[Keys.CURSOR_MODE] = updated.cursorMode.name
             prefs[Keys.PREFERRED_BACKEND] = updated.preferredBackend

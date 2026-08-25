@@ -3,7 +3,8 @@ package com.minidex.app.ui.components
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,7 +18,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Mouse
-import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -35,15 +35,17 @@ import com.minidex.app.ui.theme.LocalMiniDexColors
  * Tapping instantaneously toggles Keyboard ⇄ Touchpad.
  */
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 fun ModeSwitcherButton(
     currentMode: AppMode,
     onToggleMode: () -> Unit,
+    onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val colors = LocalMiniDexColors.current
     val isKeyboard = currentMode == AppMode.KEYBOARD
 
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(50)
     val bgColor by animateColorAsState(
         targetValue = if (isKeyboard) colors.accent.copy(alpha = 0.22f) else colors.accent.copy(alpha = 0.35f),
         label = "switcher_bg"
@@ -51,12 +53,15 @@ fun ModeSwitcherButton(
 
     Box(
         modifier = modifier
-            .height(44.dp)
+            .height(42.dp)
             .clip(shape)
             .background(bgColor, shape)
             .border(1.5.dp, colors.accent, shape)
-            .clickable { onToggleMode() }
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .combinedClickable(
+                onClick = onToggleMode,
+                onLongClick = onOpenSettings
+            )
+            .padding(horizontal = 14.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(

@@ -24,6 +24,7 @@ fun QwertyKeyboard(
     keyGap: Dp = 3.dp,
     cornerRadius: Dp = 8.dp,
     onCharPress: (Char, Int) -> Unit,
+    onSwipeWord: (String) -> Unit,
     onModifierToggle: (ModifierType) -> Unit,
     onKeyPress: (Int) -> Unit,
     modifier: Modifier = Modifier
@@ -67,7 +68,9 @@ fun QwertyKeyboard(
     )
 
     Column(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .swipeTyping(onSwipeWord),
         verticalArrangement = Arrangement.spacedBy(keyGap)
     ) {
         // Row 1: Q W E R T Y U I O P

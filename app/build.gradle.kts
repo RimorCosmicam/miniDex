@@ -124,6 +124,8 @@ dependencies {
     // which otherwise surfaces as NoSuchMethodException during pairing.
     implementation("org.conscrypt:conscrypt-android:2.5.3")
     implementation("org.bouncycastle:bcpkix-jdk15to18:1.81")
+    implementation("pl.droidsonroids.gif:android-gif-drawable:1.2.32")
+    implementation("com.squareup:gifencoder:0.10.1")
 
     // Testing
     testImplementation(libs.junit)

@@ -1,5 +1,9 @@
 package com.minidex.app.ui.settings
 
+import android.content.Intent
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,10 +29,16 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -40,7 +50,10 @@ import com.minidex.app.domain.model.HapticStrength
 import com.minidex.app.domain.model.KeyHeightLevel
 import com.minidex.app.domain.model.ThemeVariant
 import com.minidex.app.ui.theme.LocalMiniDexColors
+import com.minidex.app.ui.theme.AnimatedGifBackground
+import com.minidex.app.ui.theme.GifCropExporter
 import com.minidex.app.ui.theme.toColor
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsView(
@@ -60,12 +73,54 @@ fun SettingsView(
     modifier: Modifier = Modifier
 ) {
     val colors = LocalMiniDexColors.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var selectedTab by remember { mutableIntStateOf(0) }
+    val gifPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            onUpdatePreferences {
+                it.copy(
+                    backgroundGifUri = uri.toString(),
+                    backgroundGifScale = 1f,
+                    backgroundGifOffsetX = 0f,
+                    backgroundGifOffsetY = 0f
+                )
+            }
+        }
+    }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf("GENERAL", "THEMING").forEachIndexed { index, label ->
+                    val selected = selectedTab == index
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(50))
+                            .background(if (selected) colors.accent.copy(alpha = 0.24f) else colors.surface)
+                            .border(1.dp, if (selected) colors.accent else colors.border, RoundedCornerShape(50))
+                            .clickable { selectedTab = index }
+                            .padding(vertical = 9.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(label, color = if (selected) colors.accent else colors.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
+        if (selectedTab == 0) {
         // Section: Wireless debugging connection
         item {
             SettingsGroup(title = "CONNECTION") {
@@ -225,7 +280,9 @@ fun SettingsView(
                 )
             }
         }
+        }
 
+        if (selectedTab == 1) {
         // Section: Appearance
         item {
             SettingsGroup(title = "APPEARANCE") {
@@ -305,6 +362,90 @@ fun SettingsView(
             }
         }
 
+        item {
+            SettingsGroup(title = "ANIMATED BACKGROUND") {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (preferences.backgroundGifUri.isNotBlank()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(150.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .border(1.dp, colors.accent.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+                        ) {
+                            AnimatedGifBackground(
+                                uri = preferences.backgroundGifUri,
+                                scale = preferences.backgroundGifScale,
+                                offsetX = preferences.backgroundGifOffsetX,
+                                offsetY = preferences.backgroundGifOffsetY,
+                                opacity = 1f,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
+                    SettingsClickableRow(
+                        label = if (preferences.backgroundGifUri.isBlank()) "Choose GIF" else "Replace GIF",
+                        status = "Browse ›",
+                        statusColor = colors.accent,
+                        onClick = { gifPicker.launch(arrayOf("image/gif")) }
+                    )
+                    if (preferences.backgroundGifUri.isNotBlank()) {
+                        Text("Crop zoom", color = colors.textPrimary, fontSize = 12.sp)
+                        Slider(
+                            value = preferences.backgroundGifScale,
+                            onValueChange = { value -> onUpdatePreferences { it.copy(backgroundGifScale = value) } },
+                            valueRange = 1f..4f,
+                            colors = SliderDefaults.colors(thumbColor = colors.accent, activeTrackColor = colors.accent)
+                        )
+                        Text("Horizontal crop", color = colors.textPrimary, fontSize = 12.sp)
+                        Slider(
+                            value = preferences.backgroundGifOffsetX,
+                            onValueChange = { value -> onUpdatePreferences { it.copy(backgroundGifOffsetX = value) } },
+                            valueRange = -1f..1f,
+                            colors = SliderDefaults.colors(thumbColor = colors.accent, activeTrackColor = colors.accent)
+                        )
+                        Text("Vertical crop", color = colors.textPrimary, fontSize = 12.sp)
+                        Slider(
+                            value = preferences.backgroundGifOffsetY,
+                            onValueChange = { value -> onUpdatePreferences { it.copy(backgroundGifOffsetY = value) } },
+                            valueRange = -1f..1f,
+                            colors = SliderDefaults.colors(thumbColor = colors.accent, activeTrackColor = colors.accent)
+                        )
+                        Text("Background opacity", color = colors.textPrimary, fontSize = 12.sp)
+                        Slider(
+                            value = preferences.backgroundGifOpacity,
+                            onValueChange = { value -> onUpdatePreferences { it.copy(backgroundGifOpacity = value) } },
+                            valueRange = 0.1f..1f,
+                            colors = SliderDefaults.colors(thumbColor = colors.accent, activeTrackColor = colors.accent)
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            SettingsActionPill("SAVE CROPPED", Modifier.weight(1f)) {
+                                scope.launch {
+                                    val result = GifCropExporter.saveToGallery(
+                                        context,
+                                        preferences.backgroundGifUri,
+                                        preferences.backgroundGifScale,
+                                        preferences.backgroundGifOffsetX,
+                                        preferences.backgroundGifOffsetY
+                                    )
+                                    Toast.makeText(
+                                        context,
+                                        if (result.isSuccess) "Cropped GIF saved to Pictures/MiniDex" else "Could not save cropped GIF",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
+                            SettingsActionPill("REMOVE", Modifier.weight(1f)) {
+                                onUpdatePreferences { it.copy(backgroundGifUri = "") }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        }
+
+        if (selectedTab == 0) {
         // Section: Keyboard
         item {
             SettingsGroup(title = "KEYBOARD") {
@@ -385,7 +526,6 @@ fun SettingsView(
                 }
             }
         }
-
         // Section: Trackpad
         item {
             SettingsGroup(title = "TRACKPAD") {
@@ -495,6 +635,7 @@ fun SettingsView(
                 }
             }
         }
+        }
 
         // Extra spacing so camera cutout & mode button never overlap any settings
         item {
@@ -581,6 +722,26 @@ fun SettingsClickableRow(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
+    }
+}
+
+@Composable
+fun SettingsActionPill(
+    label: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val colors = LocalMiniDexColors.current
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .background(colors.accent.copy(alpha = 0.18f))
+            .border(1.dp, colors.accent.copy(alpha = 0.7f), RoundedCornerShape(50))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 9.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, color = colors.accent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
     }
 }
 

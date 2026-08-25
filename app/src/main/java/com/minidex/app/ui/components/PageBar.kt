@@ -31,7 +31,7 @@ fun PageBar(
     modifier: Modifier = Modifier
 ) {
     val colors = LocalMiniDexColors.current
-    val pages = KeyboardPage.entries
+    val pages = KeyboardPage.entries.filterNot { it == KeyboardPage.SETTINGS }
 
     Row(
         modifier = modifier
@@ -75,7 +75,7 @@ fun PageBar(
 
             Box(
                 modifier = Modifier
-                    .weight(if (page == KeyboardPage.SETTINGS) 0.8f else 1.0f)
+                    .weight(1f)
                     .height(26.dp)
                     .clip(shape)
                     .background(
@@ -91,9 +91,9 @@ fun PageBar(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = if (page == KeyboardPage.SETTINGS) "⚙" else page.title,
+                    text = page.title,
                     color = if (isSelected) colors.accent else colors.textSecondary,
-                    fontSize = if (page == KeyboardPage.SETTINGS) 13.sp else 10.sp,
+                    fontSize = 10.sp,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                     letterSpacing = 0.3.sp
                 )

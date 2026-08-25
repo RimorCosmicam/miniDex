@@ -5,6 +5,7 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,6 +37,7 @@ import com.minidex.app.ui.settings.AdbPairingDialog
 import com.minidex.app.ui.settings.MacroEditorDialog
 import com.minidex.app.ui.settings.SettingsView
 import com.minidex.app.ui.theme.LocalMiniDexColors
+import com.minidex.app.ui.theme.AnimatedGifBackground
 import com.minidex.app.ui.theme.MiniDexTheme
 import com.minidex.app.ui.touchpad.TouchpadView
 
@@ -53,6 +55,7 @@ fun MainScreen(viewModel: MainViewModel) {
     val isAccessibilityEnabled by viewModel.isAccessibilityEnabled.collectAsState()
     val isImeEnabled by viewModel.isImeEnabled.collectAsState()
     val showMacroEditor by viewModel.showMacroEditor.collectAsState()
+    val showSettings by viewModel.showSettings.collectAsState()
     val showAdbPairingDialog by viewModel.showAdbPairingDialog.collectAsState()
     val adbConnectionStatus by viewModel.adbConnectionStatus.collectAsState()
     val adbStatusMessage by viewModel.adbStatusMessage.collectAsState()
@@ -74,6 +77,14 @@ fun MainScreen(viewModel: MainViewModel) {
                 .navigationBarsPadding()
                 .padding(horizontal = 4.dp, vertical = 2.dp)
         ) {
+            AnimatedGifBackground(
+                uri = preferences.backgroundGifUri,
+                scale = preferences.backgroundGifScale,
+                offsetX = preferences.backgroundGifOffsetX,
+                offsetY = preferences.backgroundGifOffsetY,
+                opacity = preferences.backgroundGifOpacity,
+                modifier = Modifier.fillMaxSize()
+            )
             Column(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(3.dp)
@@ -143,6 +154,7 @@ fun MainScreen(viewModel: MainViewModel) {
                                                 keyGap = preferences.keyGapDp.dp,
                                                 cornerRadius = preferences.cornerRadiusDp.dp,
                                                 onCharPress = { char, code -> viewModel.handleCharPress(char, code) },
+                                                onSwipeWord = { viewModel.handleSwipeWord(it) },
                                                 onModifierToggle = { viewModel.toggleModifier(it) },
                                                 onKeyPress = { viewModel.handleKeyPress(it) }
                                             )
@@ -201,18 +213,46 @@ fun MainScreen(viewModel: MainViewModel) {
                     }
                 }
 
-                // Keep the mode switch clear of rounded corners and system navigation overlays.
-                Row(
+            }
+
+            ModeSwitcherButton(
+                currentMode = currentMode,
+                onToggleMode = { viewModel.toggleAppMode() },
+                onOpenSettings = { viewModel.setSettingsVisible(true) },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 18.dp, bottom = 18.dp)
+            )
+
+            if (showSettings) {
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(58.dp)
-                        .padding(start = 12.dp, end = 12.dp, bottom = 10.dp),
-                    horizontalArrangement = Arrangement.Start,
-                    verticalAlignment = Alignment.CenterVertically
+                        .fillMaxSize()
+                        .background(colors.background)
                 ) {
-                    ModeSwitcherButton(
-                        currentMode = currentMode,
-                        onToggleMode = { viewModel.toggleAppMode() }
+                    SettingsView(
+                        preferences = preferences,
+                        dexDisplayInfo = activeDexDisplay,
+                        availableDisplays = availableDisplays,
+                        isAdbConnected = isAdbConnected,
+                        adbStatusMessage = adbStatusMessage,
+                        isAccessibilityEnabled = isAccessibilityEnabled,
+                        isImeEnabled = isImeEnabled,
+                        activeBackendName = activeBackend.name,
+                        onOpenAdbPairing = { viewModel.setAdbPairingDialogVisible(true) },
+                        onOpenAccessibilitySettings = { viewModel.openAccessibilitySettings() },
+                        onOpenImeSettings = { viewModel.openImeSettings() },
+                        onLaunchSamsungDexTouchpad = { viewModel.launchSamsungDexTouchpad() },
+                        onUpdatePreferences = { viewModel.updatePreferences(it) },
+                        modifier = Modifier.padding(top = 34.dp)
+                    )
+                    androidx.compose.material3.Text(
+                        text = "CLOSE",
+                        color = colors.accent,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .clickable { viewModel.setSettingsVisible(false) }
+                            .padding(horizontal = 14.dp, vertical = 8.dp)
                     )
                 }
             }
