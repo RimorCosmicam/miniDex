@@ -36,7 +36,6 @@ import com.minidex.app.domain.model.DexDisplayInfo
 import com.minidex.app.domain.model.HapticStrength
 import com.minidex.app.domain.model.KeyHeightLevel
 import com.minidex.app.domain.model.ThemeVariant
-import com.minidex.app.input.ime.MiniDexInputMethodService
 import com.minidex.app.ui.theme.LocalMiniDexColors
 import com.minidex.app.ui.theme.toColor
 
@@ -151,6 +150,15 @@ fun SettingsView(
                                 fontSize = 7.5.sp
                             )
                         }
+                        Text(
+                            text = if (isImeEnabled) "ACTIVE" else "ENABLE →",
+                            color = if (isImeEnabled) colors.accent else colors.textSecondary,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
                 // Driver 3: Samsung Official Native DeX Touchpad (Hardware kernel injection)
                 Box(
                     modifier = Modifier
