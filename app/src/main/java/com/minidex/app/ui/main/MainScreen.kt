@@ -220,8 +220,8 @@ fun MainScreen(viewModel: MainViewModel) {
                 onToggleMode = { viewModel.toggleAppMode() },
                 onOpenSettings = { viewModel.setSettingsVisible(true) },
                 modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 18.dp, bottom = 18.dp)
+                    .align(Alignment.BottomStart)
+                    .padding(start = 28.dp, bottom = 18.dp)
             )
 
             if (showSettings) {
