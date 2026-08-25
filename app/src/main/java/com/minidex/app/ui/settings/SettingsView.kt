@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.minidex.app.data.UserPreferences
@@ -37,6 +38,7 @@ import com.minidex.app.domain.model.DexDisplayInfo
 import com.minidex.app.domain.model.HapticStrength
 import com.minidex.app.domain.model.KeyHeightLevel
 import com.minidex.app.domain.model.ThemeVariant
+import com.minidex.app.input.BluetoothHidConnectionState
 import com.minidex.app.ui.theme.LocalMiniDexColors
 import com.minidex.app.ui.theme.toColor
 
@@ -47,6 +49,8 @@ fun SettingsView(
     isAccessibilityEnabled: Boolean,
     isBluetoothHidReady: Boolean,
     activeBackendName: String,
+    bluetoothConnectionState: BluetoothHidConnectionState,
+    bluetoothError: String?,
     onOpenAccessibilitySettings: () -> Unit,
     onOpenBluetoothSettings: () -> Unit,
     onUpdatePreferences: ((UserPreferences) -> UserPreferences) -> Unit,
@@ -101,31 +105,55 @@ fun SettingsView(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (isAccessibilityEnabled) "✓ Accessibility Active" else "Enable Accessibility",
+                            text = if (isAccessibilityEnabled) "✓ Accessibility" else "Setup Accessibility",
                             color = if (isAccessibilityEnabled) colors.accent else colors.textPrimary,
                             fontSize = 8.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
 
-                    // Bluetooth HID Quick Toggle
+                    // Bluetooth HID Quick Toggle with connection status
+                    val btLabel = when (bluetoothConnectionState) {
+                        is BluetoothHidConnectionState.Connected -> "✓ MiniDex BT"
+                        is BluetoothHidConnectionState.Connecting -> "⏳ Connecting..."
+                        is BluetoothHidConnectionState.Disconnected -> {
+                            if (isBluetoothHidReady) "⚡ MiniDex BT" else "Pair MiniDex BT"
+                        }
+                    }
+                    val btActive = bluetoothConnectionState is BluetoothHidConnectionState.Connected || isBluetoothHidReady
+
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(6.dp))
-                            .background(if (isBluetoothHidReady) colors.accent.copy(alpha = 0.2f) else colors.surfaceElevated)
-                            .border(1.dp, if (isBluetoothHidReady) colors.accent else colors.border.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                            .background(if (btActive) colors.accent.copy(alpha = 0.2f) else colors.surfaceElevated)
+                            .border(1.dp, if (btActive) colors.accent else colors.border.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
                             .clickable { onOpenBluetoothSettings() }
                             .padding(vertical = 5.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (isBluetoothHidReady) "✓ Bluetooth HID Ready" else "Pair Bluetooth HID",
-                            color = if (isBluetoothHidReady) colors.accent else colors.textPrimary,
+                            text = btLabel,
+                            color = if (btActive) colors.accent else colors.textPrimary,
                             fontSize = 8.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
+                }
+
+                // Bluetooth error display
+                if (bluetoothError != null) {
+                    Text(
+                        text = "⚠ $bluetoothError",
+                        color = Color(0xFFFF6B6B),
+                        fontSize = 7.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0x33FF0000))
+                            .padding(4.dp)
+                    )
                 }
             }
         }
