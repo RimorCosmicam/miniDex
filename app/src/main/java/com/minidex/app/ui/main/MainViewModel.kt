@@ -1,6 +1,7 @@
 package com.minidex.app.ui.main
 
 import android.app.Application
+import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.minidex.app.data.MacroRepository
@@ -188,6 +189,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun openAccessibilitySettings() {
         backendManager.openAccessibilitySettings()
+    }
+
+    fun startBluetoothPairing(): Intent? {
+        return backendManager.startBluetoothPairing()
     }
 
     fun openBluetoothSettings() {

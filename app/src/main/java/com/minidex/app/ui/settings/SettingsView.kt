@@ -1,5 +1,6 @@
 package com.minidex.app.ui.settings
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -52,6 +53,7 @@ fun SettingsView(
     bluetoothConnectionState: BluetoothHidConnectionState,
     bluetoothError: String?,
     onOpenAccessibilitySettings: () -> Unit,
+    onStartBluetoothPairing: () -> Unit,
     onOpenBluetoothSettings: () -> Unit,
     onUpdatePreferences: ((UserPreferences) -> UserPreferences) -> Unit,
     modifier: Modifier = Modifier
@@ -89,59 +91,99 @@ fun SettingsView(
                     }
                 }
 
+                // Accessibility row
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (isAccessibilityEnabled) colors.accent.copy(alpha = 0.2f) else colors.surfaceElevated)
+                        .border(1.dp, if (isAccessibilityEnabled) colors.accent else colors.border.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                        .clickable { onOpenAccessibilitySettings() }
+                        .padding(vertical = 5.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (isAccessibilityEnabled) "✓ Accessibility Active" else "⚙ Enable Accessibility Service",
+                        color = if (isAccessibilityEnabled) colors.accent else colors.textPrimary,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                // Bluetooth HID row — two buttons: Pair (discoverable) + Settings
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    // Accessibility Quick Toggle
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(if (isAccessibilityEnabled) colors.accent.copy(alpha = 0.2f) else colors.surfaceElevated)
-                            .border(1.dp, if (isAccessibilityEnabled) colors.accent else colors.border.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
-                            .clickable { onOpenAccessibilitySettings() }
-                            .padding(vertical = 5.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (isAccessibilityEnabled) "✓ Accessibility" else "Setup Accessibility",
-                            color = if (isAccessibilityEnabled) colors.accent else colors.textPrimary,
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    // Bluetooth HID Quick Toggle with connection status
+                    // Main BT action button: triggers discoverable mode for pairing
                     val btLabel = when (bluetoothConnectionState) {
-                        is BluetoothHidConnectionState.Connected -> "✓ MiniDex BT"
+                        is BluetoothHidConnectionState.Connected -> "✓ BT: ${bluetoothConnectionState.deviceName}"
                         is BluetoothHidConnectionState.Connecting -> "⏳ Connecting..."
+                        is BluetoothHidConnectionState.Discoverable -> "📡 Discoverable (5 min)"
                         is BluetoothHidConnectionState.Disconnected -> {
-                            if (isBluetoothHidReady) "⚡ MiniDex BT" else "Pair MiniDex BT"
+                            if (isBluetoothHidReady) "🔗 Make Discoverable" else "🔗 Start BT Pairing"
                         }
                     }
-                    val btActive = bluetoothConnectionState is BluetoothHidConnectionState.Connected || isBluetoothHidReady
+                    val btActive = bluetoothConnectionState is BluetoothHidConnectionState.Connected
+                    val btDiscoverable = bluetoothConnectionState is BluetoothHidConnectionState.Discoverable
 
                     Box(
                         modifier = Modifier
-                            .weight(1f)
+                            .weight(2f)
                             .clip(RoundedCornerShape(6.dp))
-                            .background(if (btActive) colors.accent.copy(alpha = 0.2f) else colors.surfaceElevated)
-                            .border(1.dp, if (btActive) colors.accent else colors.border.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
-                            .clickable { onOpenBluetoothSettings() }
+                            .background(
+                                when {
+                                    btActive -> colors.accent.copy(alpha = 0.2f)
+                                    btDiscoverable -> Color(0xFF00BCD4).copy(alpha = 0.2f)
+                                    else -> colors.surfaceElevated
+                                }
+                            )
+                            .border(
+                                1.dp,
+                                when {
+                                    btActive -> colors.accent
+                                    btDiscoverable -> Color(0xFF00BCD4)
+                                    else -> colors.border.copy(alpha = 0.4f)
+                                },
+                                RoundedCornerShape(6.dp)
+                            )
+                            .clickable { onStartBluetoothPairing() }
                             .padding(vertical = 5.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = btLabel,
-                            color = if (btActive) colors.accent else colors.textPrimary,
+                            color = when {
+                                btActive -> colors.accent
+                                btDiscoverable -> Color(0xFF00BCD4)
+                                else -> colors.textPrimary
+                            },
                             fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    // Small BT Settings button
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(colors.surfaceElevated)
+                            .border(1.dp, colors.border.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                            .clickable { onOpenBluetoothSettings() }
+                            .padding(vertical = 5.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "⚙ BT Settings",
+                            color = colors.textSecondary,
+                            fontSize = 7.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
                 }
 
-                // Bluetooth error display
+                // Bluetooth error or pairing hint
                 if (bluetoothError != null) {
                     Text(
                         text = "⚠ $bluetoothError",
@@ -152,6 +194,18 @@ fun SettingsView(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(4.dp))
                             .background(Color(0x33FF0000))
+                            .padding(4.dp)
+                    )
+                } else if (bluetoothConnectionState is BluetoothHidConnectionState.Discoverable) {
+                    Text(
+                        text = "📱 On your DeX host device, open Bluetooth settings and pair with \"MiniDex\"",
+                        color = Color(0xFF00BCD4),
+                        fontSize = 7.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0x1A00BCD4))
                             .padding(4.dp)
                     )
                 }

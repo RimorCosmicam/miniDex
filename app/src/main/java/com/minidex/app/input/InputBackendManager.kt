@@ -29,7 +29,7 @@ class InputBackendManager(
     val virtualDeviceBackend = VirtualDeviceInputBackend(context)
     val fallbackBackend = FallbackInputBackend()
 
-    private val _activeBackend = MutableStateFlow<InputBackend>(accessibilityBackend)
+    private val _activeBackend = MutableStateFlow<InputBackend>(fallbackBackend)
     val activeBackend: StateFlow<InputBackend> = _activeBackend.asStateFlow()
 
     private val _isAccessibilityEnabled = MutableStateFlow(false)
@@ -45,9 +45,9 @@ class InputBackendManager(
             bluetoothHidBackend.initialize()
             refreshBackend()
 
-            // Periodic heartbeat to instantly detect when user toggles Accessibility or Bluetooth in Settings
+            // Heartbeat: detect when user toggles Accessibility or Bluetooth in Settings
             while (isActive) {
-                delay(1000)
+                delay(1500)
                 refreshBackend()
             }
         }
@@ -55,9 +55,7 @@ class InputBackendManager(
 
     fun setPreferredBackend(backendId: String) {
         preferredBackendConfig = backendId
-        scope.launch {
-            refreshBackend()
-        }
+        scope.launch { refreshBackend() }
     }
 
     fun openAccessibilitySettings() {
@@ -69,6 +67,14 @@ class InputBackendManager(
         } catch (e: Exception) {
             Log.e(TAG, "Failed to open accessibility settings", e)
         }
+    }
+
+    /**
+     * Starts the Bluetooth HID pairing flow.
+     * Returns an Intent to launch (ACTION_REQUEST_DISCOVERABLE), or null if BT isn't ready.
+     */
+    fun startBluetoothPairing(): Intent? {
+        return bluetoothHidBackend.startPairing()
     }
 
     fun openBluetoothSettings() {
@@ -95,11 +101,13 @@ class InputBackendManager(
     suspend fun refreshBackend() {
         val a11yActive = checkAccessibilityServiceConfigured()
         _isAccessibilityEnabled.value = a11yActive
+
+        val btConnected = bluetoothHidBackend.connectionState.value is BluetoothHidConnectionState.Connected
         _isBluetoothHidReady.value = bluetoothHidBackend.isAvailable
 
         val candidate: InputBackend = when (preferredBackendConfig) {
             "BLUETOOTH_HID" -> {
-                if (bluetoothHidBackend.isAvailable) bluetoothHidBackend else fallbackBackend
+                if (btConnected) bluetoothHidBackend else fallbackBackend
             }
             "ACCESSIBILITY" -> {
                 if (a11yActive) accessibilityBackend else fallbackBackend
@@ -108,11 +116,11 @@ class InputBackendManager(
                 if (virtualDeviceBackend.isAvailable) virtualDeviceBackend else fallbackBackend
             }
             "FALLBACK" -> fallbackBackend
-            else -> { // AUTO
-                if (a11yActive) {
-                    accessibilityBackend
-                } else if (bluetoothHidBackend.isAvailable) {
+            else -> { // AUTO: prefer BT HID when connected, then Accessibility, then fallback
+                if (btConnected) {
                     bluetoothHidBackend
+                } else if (a11yActive) {
+                    accessibilityBackend
                 } else {
                     fallbackBackend
                 }

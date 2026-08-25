@@ -8,6 +8,7 @@ import android.bluetooth.BluetoothHidDeviceAppSdpSettings
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
@@ -19,10 +20,13 @@ import java.util.concurrent.Executors
 
 /**
  * Native Bluetooth HID Input Backend.
- * Turns the Galaxy Z Flip7 into a real physical Bluetooth Keyboard & Mouse for Samsung DeX.
- * Zero disconnects, zero root, zero Shizuku, 100% hardware-level compatibility.
+ * Turns the Galaxy Z Flip7 into a real Bluetooth Keyboard & Mouse for Samsung DeX.
  *
- * The device will advertise itself as "MiniDex" in Bluetooth scanning/pairing.
+ * Flow:
+ * 1. App registers as BluetoothHidDevice with SDP name "MiniDex"
+ * 2. User triggers discoverable mode so the host can find "MiniDex"
+ * 3. Host (DeX PC, TV, tablet, etc.) pairs with "MiniDex"
+ * 4. MiniDex sends HID keyboard & mouse reports over Bluetooth
  */
 class BluetoothHidInputBackend(private val context: Context) : InputBackend {
 
@@ -33,6 +37,9 @@ class BluetoothHidInputBackend(private val context: Context) : InputBackend {
 
         /** The name this device will show as in Bluetooth pairing dialogs. */
         const val BT_DEVICE_NAME = "MiniDex"
+
+        /** Discoverable duration in seconds (5 minutes). */
+        const val DISCOVERABLE_DURATION = 300
 
         // Standard USB HID Keyboard & Mouse Report Descriptor
         private val HID_REPORT_DESCRIPTOR = byteArrayOf(
@@ -107,6 +114,7 @@ class BluetoothHidInputBackend(private val context: Context) : InputBackend {
 
     private var mouseButtons: Byte = 0
     private var originalAdapterName: String? = null
+    private var isRegistered: Boolean = false
 
     private val _connectionState = MutableStateFlow<BluetoothHidConnectionState>(BluetoothHidConnectionState.Disconnected)
     val connectionState: StateFlow<BluetoothHidConnectionState> = _connectionState.asStateFlow()
@@ -120,10 +128,10 @@ class BluetoothHidInputBackend(private val context: Context) : InputBackend {
             when (state) {
                 BluetoothProfile.STATE_CONNECTED -> {
                     connectedHostDevice = device
-                    _connectionState.value = BluetoothHidConnectionState.Connected(
-                        deviceName = try { device?.name } catch (_: SecurityException) { null } ?: device?.address ?: "Unknown"
-                    )
-                    Log.i(TAG, "Bluetooth HID Connected to: ${_connectionState.value}")
+                    val deviceName = try { device?.name } catch (_: SecurityException) { null } ?: device?.address ?: "Unknown"
+                    _connectionState.value = BluetoothHidConnectionState.Connected(deviceName = deviceName)
+                    _lastError.value = null
+                    Log.i(TAG, "Bluetooth HID Connected to: $deviceName")
                 }
                 BluetoothProfile.STATE_CONNECTING -> {
                     _connectionState.value = BluetoothHidConnectionState.Connecting
@@ -140,8 +148,11 @@ class BluetoothHidInputBackend(private val context: Context) : InputBackend {
 
         override fun onAppStatusChanged(pluggedDevice: BluetoothDevice?, registered: Boolean) {
             super.onAppStatusChanged(pluggedDevice, registered)
-            Log.i(TAG, "Bluetooth HID App registration status: registered=$registered")
-            if (!registered) {
+            isRegistered = registered
+            Log.i(TAG, "Bluetooth HID App registration: registered=$registered")
+            if (registered) {
+                _lastError.value = null
+            } else {
                 _connectionState.value = BluetoothHidConnectionState.Disconnected
             }
         }
@@ -158,14 +169,17 @@ class BluetoothHidInputBackend(private val context: Context) : InputBackend {
         override fun onServiceDisconnected(profile: Int) {
             if (profile == BluetoothProfile.HID_DEVICE) {
                 hidDevice = null
+                isRegistered = false
                 _connectionState.value = BluetoothHidConnectionState.Disconnected
             }
         }
     }
 
-    private fun hasBluetoothPermissions(): Boolean {
+    fun hasBluetoothPermissions(): Boolean {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            return ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+            val connect = ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+            val advertise = ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_ADVERTISE) == PackageManager.PERMISSION_GRANTED
+            return connect && advertise
         }
         return true
     }
@@ -177,44 +191,44 @@ class BluetoothHidInputBackend(private val context: Context) : InputBackend {
 
     override suspend fun initialize(): Result<Unit> {
         if (!hasBluetoothPermissions()) {
-            val msg = "Bluetooth CONNECT permission not granted. Please grant it in Settings."
+            val msg = "Bluetooth permissions not granted. Tap to request."
             _lastError.value = msg
             return Result.failure(SecurityException(msg))
         }
 
         val adapter = getAdapter()
         if (adapter == null) {
-            val msg = "Bluetooth not available on this device"
-            _lastError.value = msg
-            return Result.failure(IllegalStateException(msg))
+            _lastError.value = "Bluetooth hardware not available"
+            return Result.failure(IllegalStateException("No Bluetooth"))
         }
 
         if (!adapter.isEnabled) {
-            val msg = "Bluetooth is turned off. Please enable Bluetooth."
-            _lastError.value = msg
-            return Result.failure(IllegalStateException(msg))
+            _lastError.value = "Bluetooth is OFF. Enable it in Quick Settings."
+            return Result.failure(IllegalStateException("Bluetooth disabled"))
         }
 
         _lastError.value = null
 
-        // Set the Bluetooth adapter name to "MiniDex" so it shows clearly in pairing
+        // Set adapter name to "MiniDex" so the host sees this name during pairing
         try {
             val currentName = adapter.name
             if (currentName != BT_DEVICE_NAME) {
                 originalAdapterName = currentName
                 adapter.name = BT_DEVICE_NAME
-                Log.i(TAG, "Bluetooth adapter name changed from '$currentName' to '$BT_DEVICE_NAME'")
+                Log.i(TAG, "Bluetooth adapter name → '$BT_DEVICE_NAME' (was: '$currentName')")
             }
         } catch (e: SecurityException) {
-            Log.w(TAG, "Cannot set Bluetooth adapter name (missing permission), will use default", e)
+            Log.w(TAG, "Cannot rename Bluetooth adapter (missing permission)", e)
         }
 
-        try {
-            adapter.getProfileProxy(context, serviceListener, BluetoothProfile.HID_DEVICE)
-        } catch (e: Exception) {
-            val msg = "Failed to get Bluetooth HID profile: ${e.message}"
-            _lastError.value = msg
-            return Result.failure(e)
+        // Connect to the HID Device Bluetooth profile
+        if (hidDevice == null) {
+            try {
+                adapter.getProfileProxy(context, serviceListener, BluetoothProfile.HID_DEVICE)
+            } catch (e: Exception) {
+                _lastError.value = "Failed to access Bluetooth HID profile: ${e.message}"
+                return Result.failure(e)
+            }
         }
 
         return Result.success(Unit)
@@ -233,18 +247,56 @@ class BluetoothHidInputBackend(private val context: Context) : InputBackend {
             val registered = hid.registerApp(sdp, null, null, executor, callback)
             if (registered) {
                 _lastError.value = null
-                Log.i(TAG, "Bluetooth HID App registered successfully as 'MiniDex'")
+                Log.i(TAG, "HID app registered. Ready for pairing.")
             } else {
-                _lastError.value = "Failed to register HID app. Another app may be using the Bluetooth HID profile."
-                Log.e(TAG, "registerApp returned false")
+                _lastError.value = "HID registration failed. Close other BT keyboard apps and retry."
+                Log.e(TAG, "registerApp() returned false")
             }
         } catch (e: SecurityException) {
-            _lastError.value = "Bluetooth permission denied. Please grant BLUETOOTH_CONNECT permission."
-            Log.e(TAG, "Bluetooth permission not granted for HID device", e)
+            _lastError.value = "Bluetooth permission denied."
+            Log.e(TAG, "SecurityException in registerApp", e)
         } catch (e: Exception) {
-            _lastError.value = "Bluetooth HID registration failed: ${e.message}"
-            Log.e(TAG, "Failed to register HID App", e)
+            _lastError.value = "HID registration error: ${e.message}"
+            Log.e(TAG, "Exception in registerApp", e)
         }
+    }
+
+    /**
+     * Make the phone discoverable so the DeX host can find "MiniDex" in its Bluetooth scanner.
+     * Returns an Intent that the Activity should launch with startActivity().
+     */
+    fun createDiscoverableIntent(): Intent {
+        return Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE).apply {
+            putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, DISCOVERABLE_DURATION)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+    }
+
+    /**
+     * Start the pairing flow: ensure HID is registered, then make discoverable.
+     * Returns the intent the Activity should launch to prompt discoverability.
+     */
+    fun startPairing(): Intent? {
+        if (!hasBluetoothPermissions()) {
+            _lastError.value = "Bluetooth permissions required first."
+            return null
+        }
+
+        val adapter = getAdapter()
+        if (adapter == null || !adapter.isEnabled) {
+            _lastError.value = "Enable Bluetooth first."
+            return null
+        }
+
+        // Make sure HID app is registered
+        if (!isRegistered && hidDevice != null) {
+            registerHidApp()
+        }
+
+        _lastError.value = null
+        _connectionState.value = BluetoothHidConnectionState.Discoverable
+
+        return createDiscoverableIntent()
     }
 
     override fun sendKeyDown(keyCode: Int, metaState: Int, displayId: Int): Boolean {
@@ -312,7 +364,7 @@ class BluetoothHidInputBackend(private val context: Context) : InputBackend {
         val hid = hidDevice ?: return false
         val report = ByteArray(8)
         report[0] = modifier
-        report[1] = 0 // Reserved
+        report[1] = 0
         report[2] = key
         return try {
             hid.sendReport(device, REPORT_ID_KEYBOARD, report)
@@ -347,22 +399,18 @@ class BluetoothHidInputBackend(private val context: Context) : InputBackend {
     override fun release() {
         val hid = hidDevice
         if (hid != null) {
-            try {
-                hid.unregisterApp()
-            } catch (_: Exception) {}
+            try { hid.unregisterApp() } catch (_: Exception) {}
         }
+        isRegistered = false
 
         // Restore original adapter name
         if (originalAdapterName != null) {
-            try {
-                getAdapter()?.name = originalAdapterName
-            } catch (_: SecurityException) {}
+            try { getAdapter()?.name = originalAdapterName } catch (_: SecurityException) {}
             originalAdapterName = null
         }
 
-        val adapter = getAdapter()
         try {
-            adapter?.closeProfileProxy(BluetoothProfile.HID_DEVICE, hidDevice)
+            getAdapter()?.closeProfileProxy(BluetoothProfile.HID_DEVICE, hidDevice)
         } catch (_: Exception) {}
         hidDevice = null
         connectedHostDevice = null
@@ -372,6 +420,7 @@ class BluetoothHidInputBackend(private val context: Context) : InputBackend {
 
 sealed class BluetoothHidConnectionState {
     data object Disconnected : BluetoothHidConnectionState()
+    data object Discoverable : BluetoothHidConnectionState()
     data object Connecting : BluetoothHidConnectionState()
     data class Connected(val deviceName: String) : BluetoothHidConnectionState()
 }
