@@ -4,7 +4,6 @@ import android.app.Presentation
 import android.content.Context
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
-import android.os.Build
 import android.os.Bundle
 import android.view.Display
 import android.view.Gravity
@@ -14,7 +13,7 @@ import android.widget.FrameLayout
 
 /**
  * Overlay presentation rendered directly on the external DeX display.
- * Displays a hardware-accelerated cursor that moves smoothly in real time across the DeX monitor
+ * Displays a hardware-accelerated glowing cursor that moves smoothly in real time across the DeX monitor
  * as the user interacts with the Z Flip7 cover screen touchpad.
  */
 class DexPointerPresentation(
@@ -27,17 +26,11 @@ class DexPointerPresentation(
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Make window transparent, non-focusable, and touch-pass-through
+        // Make presentation window non-focusable and transparent
         window?.apply {
-            setType(
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-                else
-                    @Suppress("DEPRECATION")
-                    WindowManager.LayoutParams.TYPE_PHONE
-            )
             addFlags(
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                         WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                         WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                         WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
@@ -49,19 +42,19 @@ class DexPointerPresentation(
             setBackgroundColor(Color.TRANSPARENT)
         }
 
-        // Sleek cyber cursor dot with glowing ring
+        // Sleek glowing cyber cursor
         val cursor = View(context).apply {
             val drawable = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
                 setColor(0xEE00E5FF.toInt())
-                setStroke(2, 0xFFFFFFFF.toInt())
-                setSize(24, 24)
+                setStroke(3, 0xFFFFFFFF.toInt())
+                setSize(28, 28)
             }
             background = drawable
-            layoutParams = FrameLayout.LayoutParams(24, 24).apply {
+            layoutParams = FrameLayout.LayoutParams(28, 28).apply {
                 gravity = Gravity.TOP or Gravity.START
             }
-            alpha = 0.9f
+            alpha = 0.95f
         }
 
         cursorView = cursor

@@ -3,9 +3,10 @@ package com.minidex.app.input
 import android.content.Context
 import android.util.Log
 import com.minidex.app.input.accessibility.MiniDexAccessibilityService
+import com.minidex.app.input.ime.MiniDexInputMethodService
 
 /**
- * Stable, zero-disconnect native input backend leveraging Android's Multi-Display Accessibility framework.
+ * Stable, zero-disconnect native input backend leveraging Android's Multi-Display Accessibility & IME frameworks.
  * Dispatches clicks, drags, swipes, scrolls, and text actions directly to the focused Samsung DeX display.
  */
 class AccessibilityInputBackend(private val context: Context) : InputBackend {
@@ -19,7 +20,7 @@ class AccessibilityInputBackend(private val context: Context) : InputBackend {
     override val requiresPrivilegedAccess: Boolean = false
 
     override val isAvailable: Boolean
-        get() = MiniDexAccessibilityService.isServiceEnabled()
+        get() = MiniDexAccessibilityService.isServiceEnabled() || MiniDexInputMethodService.isImeActive()
 
     private var pointerX: Float = 960f
     private var pointerY: Float = 540f
@@ -34,11 +35,14 @@ class AccessibilityInputBackend(private val context: Context) : InputBackend {
             Log.i(TAG, "AccessibilityInputBackend ready for DeX injection")
             Result.success(Unit)
         } else {
-            Result.failure(IllegalStateException("Accessibility Service not enabled in system Settings"))
+            Result.failure(IllegalStateException("Accessibility Service or IME not enabled in system Settings"))
         }
     }
 
     override fun sendKeyDown(keyCode: Int, metaState: Int, displayId: Int): Boolean {
+        if (MiniDexInputMethodService.isImeActive()) {
+            return MiniDexInputMethodService.sendKeyEvent(keyCode, metaState)
+        }
         val service = MiniDexAccessibilityService.instance ?: return false
         return service.handleSpecialKey(keyCode, displayId)
     }
@@ -48,11 +52,17 @@ class AccessibilityInputBackend(private val context: Context) : InputBackend {
     }
 
     override fun sendKeyPress(keyCode: Int, metaState: Int, displayId: Int): Boolean {
+        if (MiniDexInputMethodService.isImeActive()) {
+            return MiniDexInputMethodService.sendKeyEvent(keyCode, metaState)
+        }
         val service = MiniDexAccessibilityService.instance ?: return false
         return service.handleSpecialKey(keyCode, displayId)
     }
 
     override fun sendText(text: String, displayId: Int): Boolean {
+        if (MiniDexInputMethodService.isImeActive()) {
+            return MiniDexInputMethodService.commitText(text)
+        }
         val service = MiniDexAccessibilityService.instance ?: return false
         return service.injectText(text, displayId)
     }

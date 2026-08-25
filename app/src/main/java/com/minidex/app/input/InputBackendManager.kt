@@ -70,6 +70,17 @@ class InputBackendManager(
         }
     }
 
+    fun openImeSettings() {
+        try {
+            val intent = Intent(Settings.ACTION_INPUT_METHOD_SETTINGS).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to open IME settings", e)
+        }
+    }
+
     fun startBluetoothPairing(): Intent? {
         return bluetoothHidBackend.startPairing()
     }

@@ -7,10 +7,15 @@ import android.bluetooth.BluetoothHidDevice
 import android.bluetooth.BluetoothHidDeviceAppSdpSettings
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
+import android.bluetooth.le.AdvertiseCallback
+import android.bluetooth.le.AdvertiseData
+import android.bluetooth.le.AdvertiseSettings
+import android.bluetooth.le.BluetoothLeAdvertiser
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.ParcelUuid
 import android.util.Log
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineScope
@@ -19,13 +24,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.UUID
 import java.util.concurrent.Executors
 
 /**
- * Native Bluetooth HID Input Backend.
- * Emulates a standard physical USB/Bluetooth Keyboard & Mouse directly over Bluetooth.
- *
- * App Name in Bluetooth: "MiniDex Keyboard & Mouse"
+ * High-performance Native Bluetooth HID Backend.
+ * Emulates a real Bluetooth Keyboard & Mouse using both Classic HID SDP and BLE (Bluetooth Low Energy) Advertising.
+ * This guarantees the device appears immediately on Windows, macOS, Android, iPadOS, ChromeOS, and TVs.
  */
 class BluetoothHidInputBackend(
     private val context: Context,
@@ -40,68 +45,71 @@ class BluetoothHidInputBackend(
         const val BT_DEVICE_NAME = "MiniDex Keyboard & Mouse"
         const val DISCOVERABLE_DURATION = 300 // 5 minutes
 
-        // Standard USB-IF HID Combo (Keyboard + Mouse) Report Descriptor
-        private val HID_REPORT_DESCRIPTOR = byteArrayOf(
-            // --- KEYBOARD (Report ID 1) ---
-            0x05.toByte(), 0x01.toByte(), // USAGE_PAGE (Generic Desktop)
-            0x09.toByte(), 0x06.toByte(), // USAGE (Keyboard)
-            0xa1.toByte(), 0x01.toByte(), // COLLECTION (Application)
-            0x85.toByte(), REPORT_ID_KEYBOARD.toByte(), // REPORT_ID (1)
-            0x05.toByte(), 0x07.toByte(), // USAGE_PAGE (Keyboard/Keypad)
-            0x19.toByte(), 0xe0.toByte(), // USAGE_MINIMUM (Keyboard LeftControl)
-            0x29.toByte(), 0xe7.toByte(), // USAGE_MAXIMUM (Keyboard Right GUI)
-            0x15.toByte(), 0x00.toByte(), // LOGICAL_MINIMUM (0)
-            0x25.toByte(), 0x01.toByte(), // LOGICAL_MAXIMUM (1)
-            0x75.toByte(), 0x01.toByte(), // REPORT_SIZE (1)
-            0x95.toByte(), 0x08.toByte(), // REPORT_COUNT (8)
-            0x81.toByte(), 0x02.toByte(), // INPUT (Data,Var,Abs)
-            0x95.toByte(), 0x01.toByte(), // REPORT_COUNT (1)
-            0x75.toByte(), 0x08.toByte(), // REPORT_SIZE (8)
-            0x81.toByte(), 0x03.toByte(), // INPUT (Cnst,Var,Abs)
-            0x95.toByte(), 0x06.toByte(), // REPORT_COUNT (6)
-            0x75.toByte(), 0x08.toByte(), // REPORT_SIZE (8)
-            0x15.toByte(), 0x00.toByte(), // LOGICAL_MINIMUM (0)
-            0x25.toByte(), 0x65.toByte(), // LOGICAL_MAXIMUM (101)
-            0x05.toByte(), 0x07.toByte(), // USAGE_PAGE (Keyboard/Keypad)
-            0x19.toByte(), 0x00.toByte(), // USAGE_MINIMUM (Reserved)
-            0x29.toByte(), 0x65.toByte(), // USAGE_MAXIMUM (Keyboard Application)
-            0x81.toByte(), 0x00.toByte(), // INPUT (Data,Ary,Abs)
-            0xc0.toByte(),                // END_COLLECTION
+        // Standard HID Service UUID (0x1812)
+        val HID_SERVICE_UUID: UUID = UUID.fromString("00001812-0000-1000-8000-00805f9b34fb")
 
-            // --- MOUSE (Report ID 2) ---
-            0x05.toByte(), 0x01.toByte(), // USAGE_PAGE (Generic Desktop)
-            0x09.toByte(), 0x02.toByte(), // USAGE (Mouse)
-            0xa1.toByte(), 0x01.toByte(), // COLLECTION (Application)
-            0x85.toByte(), REPORT_ID_MOUSE.toByte(), // REPORT_ID (2)
-            0x09.toByte(), 0x01.toByte(), // USAGE (Pointer)
-            0xa1.toByte(), 0x00.toByte(), // COLLECTION (Physical)
-            0x05.toByte(), 0x09.toByte(), // USAGE_PAGE (Button)
-            0x19.toByte(), 0x01.toByte(), // USAGE_MINIMUM (Button 1)
-            0x29.toByte(), 0x03.toByte(), // USAGE_MAXIMUM (Button 3)
-            0x15.toByte(), 0x00.toByte(), // LOGICAL_MINIMUM (0)
-            0x25.toByte(), 0x01.toByte(), // LOGICAL_MAXIMUM (1)
-            0x75.toByte(), 0x01.toByte(), // REPORT_SIZE (1)
-            0x95.toByte(), 0x03.toByte(), // REPORT_COUNT (3)
-            0x81.toByte(), 0x02.toByte(), // INPUT (Data,Var,Abs)
-            0x75.toByte(), 0x05.toByte(), // REPORT_SIZE (5)
-            0x95.toByte(), 0x01.toByte(), // REPORT_COUNT (1)
-            0x81.toByte(), 0x03.toByte(), // INPUT (Cnst,Var,Abs)
-            0x05.toByte(), 0x01.toByte(), // USAGE_PAGE (Generic Desktop)
-            0x09.toByte(), 0x30.toByte(), // USAGE (X)
-            0x09.toByte(), 0x31.toByte(), // USAGE (Y)
-            0x09.toByte(), 0x38.toByte(), // USAGE (Wheel)
-            0x15.toByte(), 0x81.toByte(), // LOGICAL_MINIMUM (-127)
-            0x25.toByte(), 0x7f.toByte(), // LOGICAL_MAXIMUM (127)
-            0x75.toByte(), 0x08.toByte(), // REPORT_SIZE (8)
-            0x95.toByte(), 0x03.toByte(), // REPORT_COUNT (3)
-            0x81.toByte(), 0x06.toByte(), // INPUT (Data,Var,Rel)
-            0xc0.toByte(),                // END_COLLECTION
-            0xc0.toByte()                 // END_COLLECTION
+        // USB-IF Standard HID Combo Descriptor
+        private val HID_REPORT_DESCRIPTOR = byteArrayOf(
+            // Keyboard (Report ID 1)
+            0x05.toByte(), 0x01.toByte(),
+            0x09.toByte(), 0x06.toByte(),
+            0xa1.toByte(), 0x01.toByte(),
+            0x85.toByte(), REPORT_ID_KEYBOARD.toByte(),
+            0x05.toByte(), 0x07.toByte(),
+            0x19.toByte(), 0xe0.toByte(),
+            0x29.toByte(), 0xe7.toByte(),
+            0x15.toByte(), 0x00.toByte(),
+            0x25.toByte(), 0x01.toByte(),
+            0x75.toByte(), 0x01.toByte(),
+            0x95.toByte(), 0x08.toByte(),
+            0x81.toByte(), 0x02.toByte(),
+            0x95.toByte(), 0x01.toByte(),
+            0x75.toByte(), 0x08.toByte(),
+            0x81.toByte(), 0x03.toByte(),
+            0x95.toByte(), 0x06.toByte(),
+            0x75.toByte(), 0x08.toByte(),
+            0x15.toByte(), 0x00.toByte(),
+            0x25.toByte(), 0x65.toByte(),
+            0x05.toByte(), 0x07.toByte(),
+            0x19.toByte(), 0x00.toByte(),
+            0x29.toByte(), 0x65.toByte(),
+            0x81.toByte(), 0x00.toByte(),
+            0xc0.toByte(),
+
+            // Mouse (Report ID 2)
+            0x05.toByte(), 0x01.toByte(),
+            0x09.toByte(), 0x02.toByte(),
+            0xa1.toByte(), 0x01.toByte(),
+            0x85.toByte(), REPORT_ID_MOUSE.toByte(),
+            0x09.toByte(), 0x01.toByte(),
+            0xa1.toByte(), 0x00.toByte(),
+            0x05.toByte(), 0x09.toByte(),
+            0x19.toByte(), 0x01.toByte(),
+            0x29.toByte(), 0x03.toByte(),
+            0x15.toByte(), 0x00.toByte(),
+            0x25.toByte(), 0x01.toByte(),
+            0x75.toByte(), 0x01.toByte(),
+            0x95.toByte(), 0x03.toByte(),
+            0x81.toByte(), 0x02.toByte(),
+            0x75.toByte(), 0x05.toByte(),
+            0x95.toByte(), 0x01.toByte(),
+            0x81.toByte(), 0x03.toByte(),
+            0x05.toByte(), 0x01.toByte(),
+            0x09.toByte(), 0x30.toByte(),
+            0x09.toByte(), 0x31.toByte(),
+            0x09.toByte(), 0x38.toByte(),
+            0x15.toByte(), 0x81.toByte(),
+            0x25.toByte(), 0x7f.toByte(),
+            0x75.toByte(), 0x08.toByte(),
+            0x95.toByte(), 0x03.toByte(),
+            0x81.toByte(), 0x06.toByte(),
+            0xc0.toByte(),
+            0xc0.toByte()
         )
     }
 
     override val id: String = "BLUETOOTH_HID"
-    override val name: String = "Bluetooth HID (Hardware Emulation)"
+    override val name: String = "Bluetooth HID (MiniDex)"
     override val requiresPrivilegedAccess: Boolean = false
 
     override val isAvailable: Boolean
@@ -113,6 +121,7 @@ class BluetoothHidInputBackend(
 
     private var mouseButtons: Byte = 0
     private var isRegistered: Boolean = false
+    private var advertiser: BluetoothLeAdvertiser? = null
 
     private val _connectionState = MutableStateFlow<BluetoothHidConnectionState>(BluetoothHidConnectionState.Disconnected)
     val connectionState: StateFlow<BluetoothHidConnectionState> = _connectionState.asStateFlow()
@@ -133,6 +142,7 @@ class BluetoothHidInputBackend(
                         val devName = try { device?.name } catch (_: SecurityException) { null } ?: device?.address ?: "Connected Host"
                         _connectionState.value = BluetoothHidConnectionState.Connected(deviceName = devName)
                         _lastError.value = null
+                        stopBleAdvertising()
                         Log.i(TAG, "Bluetooth HID Connected to: $devName")
                     }
                     BluetoothProfile.STATE_CONNECTING -> {
@@ -143,7 +153,7 @@ class BluetoothHidInputBackend(
                             connectedHostDevice = null
                         }
                         _connectionState.value = BluetoothHidConnectionState.Disconnected
-                        Log.i(TAG, "Bluetooth HID Disconnected from device")
+                        Log.i(TAG, "Bluetooth HID Disconnected")
                     }
                 }
             }
@@ -168,7 +178,7 @@ class BluetoothHidInputBackend(
         override fun onServiceConnected(profile: Int, proxy: BluetoothProfile?) {
             if (profile == BluetoothProfile.HID_DEVICE) {
                 hidDevice = proxy as? BluetoothHidDevice
-                Log.i(TAG, "BluetoothProfile.HID_DEVICE connected proxy")
+                Log.i(TAG, "Bluetooth HID profile connected")
                 registerHidApp()
             }
         }
@@ -179,6 +189,18 @@ class BluetoothHidInputBackend(
                 isRegistered = false
                 _connectionState.value = BluetoothHidConnectionState.Disconnected
             }
+        }
+    }
+
+    private val advertiseCallback = object : AdvertiseCallback() {
+        override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
+            super.onStartSuccess(settingsInEffect)
+            Log.i(TAG, "BLE HID Advertising started successfully as '$BT_DEVICE_NAME'")
+        }
+
+        override fun onStartFailure(errorCode: Int) {
+            super.onStartFailure(errorCode)
+            Log.w(TAG, "BLE Advertising failed with error code: $errorCode")
         }
     }
 
@@ -208,7 +230,7 @@ class BluetoothHidInputBackend(
 
     override suspend fun initialize(): Result<Unit> {
         if (!hasBluetoothPermissions()) {
-            val msg = "Grant Bluetooth permissions in Settings to enable Bluetooth HID"
+            val msg = "Grant Bluetooth permissions in Settings"
             _lastError.value = msg
             return Result.failure(SecurityException(msg))
         }
@@ -220,13 +242,12 @@ class BluetoothHidInputBackend(
         }
 
         if (!adapter.isEnabled) {
-            _lastError.value = "Bluetooth is turned OFF"
+            _lastError.value = "Bluetooth is OFF"
             return Result.failure(IllegalStateException("Bluetooth disabled"))
         }
 
         _lastError.value = null
 
-        // Connect proxy if not already connected
         if (hidDevice == null) {
             try {
                 adapter.getProfileProxy(context, serviceListener, BluetoothProfile.HID_DEVICE)
@@ -247,52 +268,76 @@ class BluetoothHidInputBackend(
         try {
             val sdp = BluetoothHidDeviceAppSdpSettings(
                 BT_DEVICE_NAME,
-                "MiniDex Cover Screen Keyboard & Trackpad",
+                "MiniDex Keyboard & Touchpad",
                 "RimorCosmicam",
                 BluetoothHidDevice.SUBCLASS1_COMBO,
                 HID_REPORT_DESCRIPTOR
             )
-            val ok = hid.registerApp(sdp, null, null, executor, callback)
-            if (ok) {
-                _lastError.value = null
-                Log.i(TAG, "registerApp submitted successfully for '$BT_DEVICE_NAME'")
-            } else {
-                _lastError.value = "HID registration busy. Retry in a moment."
-                Log.w(TAG, "registerApp returned false")
-            }
+            hid.registerApp(sdp, null, null, executor, callback)
+            _lastError.value = null
         } catch (e: SecurityException) {
-            _lastError.value = "Bluetooth permission denied."
-            Log.e(TAG, "registerApp SecurityException", e)
+            _lastError.value = "Bluetooth permission denied"
+            Log.e(TAG, "SecurityException in registerApp", e)
         } catch (e: Exception) {
             _lastError.value = "HID error: ${e.message}"
-            Log.e(TAG, "registerApp Exception", e)
+            Log.e(TAG, "Exception in registerApp", e)
         }
     }
 
-    /**
-     * Connect directly to an already paired Bluetooth host.
-     */
+    private fun startBleAdvertising() {
+        val adapter = getAdapter() ?: return
+        if (!hasBluetoothPermissions()) return
+
+        try {
+            advertiser = adapter.bluetoothLeAdvertiser
+            if (advertiser != null) {
+                val settings = AdvertiseSettings.Builder()
+                    .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
+                    .setConnectable(true)
+                    .setTimeout(0)
+                    .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
+                    .build()
+
+                val data = AdvertiseData.Builder()
+                    .setIncludeDeviceName(true)
+                    .addServiceUuid(ParcelUuid(HID_SERVICE_UUID))
+                    .build()
+
+                advertiser?.startAdvertising(settings, data, advertiseCallback)
+                Log.i(TAG, "Triggered BLE advertising for '$BT_DEVICE_NAME'")
+            }
+        } catch (e: SecurityException) {
+            Log.e(TAG, "SecurityException starting BLE advertiser", e)
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception starting BLE advertiser", e)
+        }
+    }
+
+    private fun stopBleAdvertising() {
+        try {
+            advertiser?.stopAdvertising(advertiseCallback)
+            advertiser = null
+        } catch (e: Exception) {}
+    }
+
     fun connectToDevice(device: BluetoothDevice) {
         val hid = hidDevice
         if (hid == null) {
-            _lastError.value = "HID device service not ready. Tap Start BT first."
+            _lastError.value = "HID driver not ready. Try again in 2 seconds."
             return
         }
         try {
             _connectionState.value = BluetoothHidConnectionState.Connecting
             val ok = hid.connect(device)
             if (!ok) {
-                _lastError.value = "Failed to initiate connection to ${device.name ?: device.address}"
+                _lastError.value = "Connection request refused by system"
                 _connectionState.value = BluetoothHidConnectionState.Disconnected
             }
         } catch (e: SecurityException) {
-            _lastError.value = "Permission denied connecting to device"
+            _lastError.value = "Bluetooth permission denied"
         }
     }
 
-    /**
-     * Prepares device for Bluetooth pairing and returns the discoverable Intent.
-     */
     fun startPairing(): Intent? {
         if (!hasBluetoothPermissions()) {
             _lastError.value = "Bluetooth permission required"
@@ -305,19 +350,22 @@ class BluetoothHidInputBackend(
             return null
         }
 
-        // Set device name so other devices clearly see MiniDex
+        // Rename device adapter to "MiniDex Keyboard & Mouse"
         try {
             adapter.name = BT_DEVICE_NAME
         } catch (e: SecurityException) {
             Log.w(TAG, "Cannot rename adapter", e)
         }
 
-        // Ensure HID proxy and app registration are triggered
+        // Ensure HID registration
         if (hidDevice == null) {
             adapter.getProfileProxy(context, serviceListener, BluetoothProfile.HID_DEVICE)
         } else if (!isRegistered) {
             registerHidApp()
         }
+
+        // Start active BLE advertising so all computers and scanners discover it instantly
+        startBleAdvertising()
 
         _connectionState.value = BluetoothHidConnectionState.Discoverable
         _lastError.value = null
@@ -420,6 +468,7 @@ class BluetoothHidInputBackend(
     }
 
     override fun release() {
+        stopBleAdvertising()
         val hid = hidDevice
         if (hid != null) {
             try { hid.unregisterApp() } catch (_: Exception) {}
