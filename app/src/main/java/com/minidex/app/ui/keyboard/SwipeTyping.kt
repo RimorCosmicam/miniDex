@@ -2,9 +2,9 @@ package com.minidex.app.ui.keyboard
 
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.awaitEachGesture
-import androidx.compose.ui.input.pointer.awaitFirstDown
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlin.math.abs
 import kotlin.math.floor
@@ -99,7 +99,10 @@ fun Modifier.swipeTyping(onWord: (String) -> Unit): Modifier = pointerInput(onWo
             val event = awaitPointerEvent(PointerEventPass.Initial)
             val change = event.changes.firstOrNull { it.id == down.id } ?: break
             val position = change.position
-            distance += hypot(position.x - lastPosition.x, position.y - lastPosition.y)
+            distance += hypot(
+                (position.x - lastPosition.x).toDouble(),
+                (position.y - lastPosition.y).toDouble()
+            ).toFloat()
             if (distance > 28f) swiping = true
             if (swiping) {
                 change.consume()
