@@ -35,7 +35,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.minidex.app.data.UserPreferences
 import com.minidex.app.domain.model.AccentColor
-import com.minidex.app.domain.model.CursorMode
 import com.minidex.app.domain.model.DexDisplayInfo
 import com.minidex.app.domain.model.HapticStrength
 import com.minidex.app.domain.model.KeyHeightLevel
@@ -396,44 +395,12 @@ fun SettingsView(
                             .padding(vertical = 4.dp),
                         verticalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
-                        Text(text = "Force Cursor Mode", color = colors.textPrimary, fontSize = 13.sp)
+                        Text(text = "Hardware Cursor", color = colors.textPrimary, fontSize = 13.sp)
                         Text(
-                            text = "Try each mode while moving on the pad. Changes apply immediately.",
+                            text = "Uses the same shell Binder and legacy UHID protocol as the supplied working app. Connection is only marked active after the mouse service responds.",
                             color = colors.textSecondary,
                             fontSize = 10.sp
                         )
-                        CursorMode.entries.forEach { mode ->
-                            val selected = preferences.cursorMode == mode
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(7.dp))
-                                    .background(if (selected) colors.accent.copy(alpha = 0.18f) else colors.surfaceElevated)
-                                    .border(
-                                        1.dp,
-                                        if (selected) colors.accent else colors.border.copy(alpha = 0.55f),
-                                        RoundedCornerShape(7.dp)
-                                    )
-                                    .clickable { onUpdatePreferences { it.copy(cursorMode = mode) } }
-                                    .padding(horizontal = 9.dp, vertical = 7.dp),
-                                verticalArrangement = Arrangement.spacedBy(2.dp)
-                            ) {
-                                Text(
-                                    text = mode.displayName,
-                                    color = if (selected) colors.accent else colors.textPrimary,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                    maxLines = 1
-                                )
-                                Text(
-                                    text = mode.description,
-                                    color = colors.textSecondary,
-                                    fontSize = 9.sp,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
                     }
 
                     SettingsDivider()

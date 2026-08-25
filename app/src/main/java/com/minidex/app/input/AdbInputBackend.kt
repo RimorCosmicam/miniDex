@@ -118,17 +118,7 @@ class AdbInputBackend(
         val relativeY = totalY.toInt()
         hidRemainderX = totalX - relativeX
         hidRemainderY = totalY - relativeY
-        when (cursorMode) {
-            CursorMode.AUTO_NATIVE,
-            CursorMode.ANDROID_HID -> {
-                if (adbManager.sendHidPointerMove(relativeX, relativeY)) return true
-            }
-            CursorMode.DISPLAY_ROLL -> {
-                val display = if (displayId >= 0) " -d $displayId" else ""
-                return adbManager.sendCommand("input trackball$display roll $relativeX $relativeY")
-            }
-            CursorMode.DISPLAY_ABSOLUTE -> Unit
-        }
+        if (adbManager.sendHidPointerMove(relativeX, relativeY)) return true
 
         // Compatibility fallback for devices whose ROM omits Android's `hid` command.
         val cmd = "${inputPrefix("mouse", displayId)} motionevent MOVE ${cursorX.toInt()} ${cursorY.toInt()}"
@@ -138,10 +128,7 @@ class AdbInputBackend(
     override fun sendPointerDown(button: Int, displayId: Int): Boolean {
         if (!isAvailable) return false
         isDragging = true
-        if (cursorMode != CursorMode.DISPLAY_ROLL &&
-            cursorMode != CursorMode.DISPLAY_ABSOLUTE &&
-            adbManager.sendHidPointerButton(button, true)
-        ) return true
+        if (adbManager.sendHidPointerButton(button, true)) return true
         val cmd = "${inputPrefix("mouse", displayId)} motionevent DOWN ${cursorX.toInt()} ${cursorY.toInt()}"
         return adbManager.sendCommand(cmd)
     }
@@ -149,20 +136,14 @@ class AdbInputBackend(
     override fun sendPointerUp(button: Int, displayId: Int): Boolean {
         if (!isAvailable) return false
         isDragging = false
-        if (cursorMode != CursorMode.DISPLAY_ROLL &&
-            cursorMode != CursorMode.DISPLAY_ABSOLUTE &&
-            adbManager.sendHidPointerButton(button, false)
-        ) return true
+        if (adbManager.sendHidPointerButton(button, false)) return true
         val cmd = "${inputPrefix("mouse", displayId)} motionevent UP ${cursorX.toInt()} ${cursorY.toInt()}"
         return adbManager.sendCommand(cmd)
     }
 
     override fun sendPointerClick(button: Int, displayId: Int): Boolean {
         if (!isAvailable) return false
-        if (cursorMode != CursorMode.DISPLAY_ROLL &&
-            cursorMode != CursorMode.DISPLAY_ABSOLUTE &&
-            adbManager.sendHidPointerClick(button)
-        ) return true
+        if (adbManager.sendHidPointerClick(button)) return true
         val cmd = if (button == 2) {
             // Secondary / Right Click: context menu key or tap
             "${inputPrefix("keyboard", displayId)} keyevent ${KeyEvent.KEYCODE_MENU}"

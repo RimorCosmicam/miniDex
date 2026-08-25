@@ -61,12 +61,11 @@ android {
     }
 }
 
-// Build the tiny arm64 shell-side UHID bridge as an APK asset. It runs under
-// the already-authorized ADB shell UID, which is allowed to open /dev/uhid.
+// Build the shell-side JNI library used by the app_process Binder service.
 val generatedUhidAssets = layout.buildDirectory.dir("generated/uhidAssets")
-val buildUhidHelper = tasks.register<Exec>("buildUhidHelper") {
-    val source = layout.projectDirectory.file("src/main/cpp/minidex_uhid.c")
-    val output = generatedUhidAssets.map { it.file("minidex_uhid_arm64") }
+val buildUhidJni = tasks.register<Exec>("buildUhidJni") {
+    val source = layout.projectDirectory.file("src/main/cpp/minidex_uhid_jni.c")
+    val output = generatedUhidAssets.map { it.file("libminidex_uhid.so") }
     inputs.file(source)
     outputs.file(output)
 
@@ -82,7 +81,7 @@ val buildUhidHelper = tasks.register<Exec>("buildUhidHelper") {
         output.get().asFile.parentFile.mkdirs()
         commandLine(
             clang.absolutePath,
-            "-Oz", "-fPIE", "-pie", "-s",
+            "-Oz", "-fPIC", "-shared", "-s",
             source.asFile.absolutePath,
             "-o", output.get().asFile.absolutePath
         )
@@ -91,7 +90,7 @@ val buildUhidHelper = tasks.register<Exec>("buildUhidHelper") {
 
 android.sourceSets.getByName("main").assets.srcDir(generatedUhidAssets)
 tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }.configureEach {
-    dependsOn(buildUhidHelper)
+    dependsOn(buildUhidJni)
 }
 
 dependencies {

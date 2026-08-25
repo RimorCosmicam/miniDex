@@ -1,12 +1,16 @@
 package com.minidex.app.input.adb
 
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.os.Build
 import android.provider.Settings
 import android.util.Log
 import com.minidex.app.domain.model.CursorMode
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
@@ -21,6 +25,8 @@ import kotlinx.coroutines.withContext
 import rikka.shizuku.Shizuku
 import io.github.muntashirakon.adb.AdbStream
 import java.io.InputStream
+import java.io.File
+import java.io.FileOutputStream
 import java.io.OutputStream
 import java.lang.reflect.Method
 import java.util.concurrent.atomic.AtomicBoolean
@@ -82,11 +88,39 @@ class AdbConnectionManager(
     private var hidOutputStream: OutputStream? = null
     private var hidButtonMask = 0
     private var nativeHidProtocol = false
+    @Volatile private var mouseService: IMouseControl? = null
+    @Volatile private var binderWaiter: CompletableDeferred<IMouseControl>? = null
     @Volatile private var requestedCursorMode = CursorMode.AUTO_NATIVE
 
     private val isConnecting = AtomicBoolean(false)
 
+    private val mouseBinderReceiver = object : BroadcastReceiver() {
+        override fun onReceive(receiverContext: Context?, intent: Intent?) {
+            if (intent?.action != PrivilegedMouseService.ACTION_BINDER_READY) return
+            val container = if (Build.VERSION.SDK_INT >= 33) {
+                intent.getParcelableExtra(
+                    PrivilegedMouseService.EXTRA_BINDER,
+                    BinderContainer::class.java
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra(PrivilegedMouseService.EXTRA_BINDER)
+            } ?: return
+            val service = IMouseControl.Stub.asInterface(container.binder) ?: return
+            mouseService = service
+            binderWaiter?.complete(service)
+            Log.i(TAG, "Privileged UHID Binder received")
+        }
+    }
+
     init {
+        val filter = IntentFilter(PrivilegedMouseService.ACTION_BINDER_READY)
+        if (Build.VERSION.SDK_INT >= 33) {
+            context.registerReceiver(mouseBinderReceiver, filter, Context.RECEIVER_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            context.registerReceiver(mouseBinderReceiver, filter)
+        }
         checkShizukuStatus()
         try {
             Shizuku.addBinderReceivedListenerSticky {
@@ -311,6 +345,17 @@ class AdbConnectionManager(
 
     /** Sends relative motion through a real virtual HID mouse so Android renders its cursor. */
     fun sendHidPointerMove(dx: Int, dy: Int): Boolean = synchronized(hidLock) {
+        mouseService?.let { service ->
+            return@synchronized runCatching {
+                check(service.isReady)
+                service.moveCursor(dx, dy)
+                true
+            }.getOrElse {
+                Log.w(TAG, "Privileged mouse movement failed", it)
+                mouseService = null
+                false
+            }
+        }
         if (hidOutputStream == null) return@synchronized false
         if (dx == 0 && dy == 0) return@synchronized true
         var remainingX = dx
@@ -339,6 +384,17 @@ class AdbConnectionManager(
     }
 
     fun sendHidPointerButton(button: Int, isDown: Boolean): Boolean = synchronized(hidLock) {
+        mouseService?.let { service ->
+            return@synchronized runCatching {
+                check(service.isReady)
+                service.setButton(button, isDown)
+                true
+            }.getOrElse {
+                Log.w(TAG, "Privileged mouse button failed", it)
+                mouseService = null
+                false
+            }
+        }
         if (hidOutputStream == null) return@synchronized false
         val bit = when (button) {
             2 -> 0x02
@@ -353,6 +409,19 @@ class AdbConnectionManager(
     }
 
     fun sendHidPointerClick(button: Int): Boolean = synchronized(hidLock) {
+        mouseService?.let { service ->
+            return@synchronized runCatching {
+                check(service.isReady)
+                service.setButton(button, true)
+                Thread.sleep(50)
+                service.setButton(button, false)
+                true
+            }.getOrElse {
+                Log.w(TAG, "Privileged mouse click failed", it)
+                mouseService = null
+                false
+            }
+        }
         if (hidOutputStream == null) return@synchronized false
         val bit = when (button) {
             2 -> 0x02
@@ -374,6 +443,17 @@ class AdbConnectionManager(
     }
 
     fun sendHidScroll(horizontal: Int, vertical: Int): Boolean = synchronized(hidLock) {
+        mouseService?.let { service ->
+            return@synchronized runCatching {
+                check(service.isReady)
+                service.scroll(vertical, horizontal)
+                true
+            }.getOrElse {
+                Log.w(TAG, "Privileged mouse scroll failed", it)
+                mouseService = null
+                false
+            }
+        }
         if (hidOutputStream == null) return@synchronized false
         var remainingH = horizontal
         var remainingV = vertical
@@ -391,59 +471,83 @@ class AdbConnectionManager(
     }
 
     private suspend fun startCursorTransport(useShizuku: Boolean): Boolean {
-        return if (requestedCursorMode == CursorMode.ANDROID_HID) {
-            startPlatformHidMouse(useShizuku)
-        } else {
-            startNativeHidMouse(useShizuku) || startPlatformHidMouse(useShizuku)
-        }
+        // All previous compatibility modes were speculative. The supplied APK's
+        // proven app_process + Binder + legacy UHID path is now authoritative.
+        return startPrivilegedBinderMouse(useShizuku) || startPlatformHidMouse(useShizuku)
     }
 
-    private suspend fun startNativeHidMouse(useShizuku: Boolean): Boolean = withContext(Dispatchers.IO) {
-        synchronized(hidLock) {
-            closeHidMouseLocked()
+    private suspend fun startPrivilegedBinderMouse(useShizuku: Boolean): Boolean =
+        withContext(Dispatchers.IO) {
+            synchronized(hidLock) { closeHidMouseLocked() }
             try {
-                val remotePath = "/data/local/tmp/minidex_uhid"
-                val installed = context.assets.open("minidex_uhid_arm64").use { asset ->
-                    if (useShizuku) {
-                        val installer = spawnShizukuProcess(arrayOf("sh", "-c", "cat > $remotePath"))
-                            ?: return@synchronized false
-                        installer.outputStream.use { asset.copyTo(it) }
-                        installer.waitFor() == 0
-                    } else {
-                        pairingClient.openShellStream("cat > $remotePath").use { stream ->
-                            stream.openOutputStream().use { asset.copyTo(it) }
-                        }
-                        true
-                    }
+                val externalDir = checkNotNull(context.getExternalFilesDir(null)) {
+                    "External files directory unavailable"
                 }
-                if (!installed) return@synchronized false
+                val stagingFile = File(externalDir, "libminidex_uhid.so")
+                context.assets.open("libminidex_uhid.so").use { source ->
+                    FileOutputStream(stagingFile).use { target -> source.copyTo(target) }
+                }
+                stagingFile.setReadable(true, false)
+
+                val remoteLibrary = PrivilegedMouseService.NATIVE_LIBRARY_PATH
+                val copyCommand =
+                    "cp '${stagingFile.absolutePath}' '$remoteLibrary' && " +
+                        "chmod 755 '$remoteLibrary' && test -r '$remoteLibrary' && echo READY"
+                val copyOutput = if (useShizuku) {
+                    val process = spawnShizukuProcess(arrayOf("sh", "-c", copyCommand))
+                        ?: error("Could not start privileged library installer")
+                    val output = process.inputStream.bufferedReader().readText()
+                    check(process.waitFor() == 0) { output.ifBlank { "Library copy failed" } }
+                    output
+                } else {
+                    pairingClient.executeShell(copyCommand)
+                }
+                check(copyOutput.contains("READY")) {
+                    "Native library was not installed: ${copyOutput.trim()}"
+                }
+                stagingFile.delete()
+
+                val waiter = CompletableDeferred<IMouseControl>()
+                binderWaiter = waiter
+                val sourceApk = context.applicationInfo.sourceDir
+                val className = PrivilegedMouseService::class.java.name
+                val launchCommand =
+                    "export CLASSPATH='$sourceApk'; " +
+                        "export LD_LIBRARY_PATH=/data/local/tmp:/system/lib64:/system/lib; " +
+                        "exec /system/bin/app_process /system/bin '$className' '${context.packageName}'"
 
                 if (useShizuku) {
-                    val chmod = spawnShizukuProcess(arrayOf("sh", "-c", "chmod 700 $remotePath"))
-                        ?: return@synchronized false
-                    chmod.waitFor()
-                    val process = spawnShizukuProcess(arrayOf("sh", "-c", remotePath))
-                        ?: return@synchronized false
-                    hidProcess = process
-                    hidOutputStream = process.outputStream
-                    scope.launch(Dispatchers.IO) { runCatching { drainHidOutput(process.inputStream) } }
+                    val process = spawnShizukuProcess(arrayOf("sh", "-c", launchCommand))
+                        ?: error("Could not launch privileged mouse service")
+                    synchronized(hidLock) { hidProcess = process }
+                    scope.launch(Dispatchers.IO) {
+                        runCatching { drainHidOutput(process.inputStream) }
+                    }
                 } else {
-                    val stream = pairingClient.openShellStream("chmod 700 $remotePath && exec $remotePath")
-                    hidAdbStream = stream
-                    hidOutputStream = stream.openOutputStream()
-                    scope.launch(Dispatchers.IO) { runCatching { drainHidOutput(stream.openInputStream()) } }
+                    val stream = pairingClient.openShellStream(launchCommand)
+                    synchronized(hidLock) { hidAdbStream = stream }
+                    scope.launch(Dispatchers.IO) {
+                        runCatching { drainHidOutput(stream.openInputStream()) }
+                    }
                 }
-                nativeHidProtocol = true
+
+                val service = withTimeoutOrNull(5_000L) { waiter.await() }
+                    ?: error("Privileged mouse service did not return its Binder")
+                check(service.isReady) { "Privileged mouse service failed its UHID health check" }
+                synchronized(hidLock) {
+                    mouseService = service
+                    hidButtonMask = 0
+                }
+                Log.i(TAG, "Exact legacy UHID mouse is ready through Binder")
                 true
-            } catch (e: Exception) {
-                Log.w(TAG, "Native UHID mouse unavailable", e)
-                closeHidMouseLocked()
+            } catch (error: Throwable) {
+                Log.e(TAG, "Exact privileged UHID mouse failed", error)
+                synchronized(hidLock) { closeHidMouseLocked() }
                 false
+            } finally {
+                binderWaiter = null
             }
         }
-    }.also { ready ->
-        if (ready) delay(140)
-    }
 
     private suspend fun startPlatformHidMouse(useShizuku: Boolean): Boolean = withContext(Dispatchers.IO) {
         synchronized(hidLock) {
@@ -520,6 +624,8 @@ class AdbConnectionManager(
     }
 
     private fun closeHidMouseLocked() {
+        runCatching { mouseService?.destroy() }
+        mouseService = null
         runCatching { hidOutputStream?.close() }
         runCatching { hidAdbStream?.close() }
         runCatching { hidProcess?.destroy() }
