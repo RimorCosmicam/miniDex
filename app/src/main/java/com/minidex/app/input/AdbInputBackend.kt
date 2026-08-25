@@ -33,10 +33,9 @@ class AdbInputBackend(
     private var cursorX = displayWidth / 2f
     private var cursorY = displayHeight / 2f
     private var isDragging = false
-    private var hidRemainderX = 0f
-    private var hidRemainderY = 0f
-    private var scrollRemainderX = 0f
-    private var scrollRemainderY = 0f
+    private var dragStartX = 0f
+    private var dragStartY = 0f
+    private var dragDisplayId = -1
     private var cursorMode = CursorMode.AUTO_NATIVE
     private var targetDisplayId = -1
 
@@ -113,32 +112,38 @@ class AdbInputBackend(
         cursorX = (cursorX + dx).coerceIn(0f, displayWidth - 1f)
         cursorY = (cursorY + dy).coerceIn(0f, displayHeight - 1f)
 
-        val totalX = dx + hidRemainderX
-        val totalY = dy + hidRemainderY
-        val relativeX = totalX.toInt()
-        val relativeY = totalY.toInt()
-        hidRemainderX = totalX - relativeX
-        hidRemainderY = totalY - relativeY
         targetDisplayId = displayId
         fakeCursor.showAt(displayId, cursorX, cursorY)
-        if (adbManager.sendHidPointerMove(relativeX, relativeY)) return true
-        val cmd = "${inputPrefix("mouse", displayId)} motionevent MOVE ${cursorX.toInt()} ${cursorY.toInt()}"
-        return adbManager.sendCommand(cmd)
+        // Do not move the global HID pointer: Samsung associates that hidden
+        // device with FlexView/default display and launches apps there.
+        return true
     }
 
     override fun sendPointerDown(button: Int, displayId: Int): Boolean {
         if (!isAvailable) return false
         isDragging = true
-        if (adbManager.sendHidPointerButton(button, true)) return true
-        val cmd = "${inputPrefix("mouse", displayId)} motionevent DOWN ${cursorX.toInt()} ${cursorY.toInt()}"
-        return adbManager.sendCommand(cmd)
+        dragStartX = cursorX
+        dragStartY = cursorY
+        dragDisplayId = displayId
+        return true
     }
 
     override fun sendPointerUp(button: Int, displayId: Int): Boolean {
         if (!isAvailable) return false
+        if (!isDragging) return true
         isDragging = false
-        if (adbManager.sendHidPointerButton(button, false)) return true
-        val cmd = "${inputPrefix("mouse", displayId)} motionevent UP ${cursorX.toInt()} ${cursorY.toInt()}"
+        val target = if (dragDisplayId >= 0) dragDisplayId else displayId
+        if (MiniDexAccessibilityService.instance?.dispatchDrag(
+                dragStartX,
+                dragStartY,
+                cursorX,
+                cursorY,
+                target,
+                80L
+            ) == true
+        ) return true
+        val cmd = "${inputPrefix("touchscreen", target)} swipe " +
+            "${dragStartX.toInt()} ${dragStartY.toInt()} ${cursorX.toInt()} ${cursorY.toInt()} 80"
         return adbManager.sendCommand(cmd)
     }
 
@@ -150,7 +155,6 @@ class AdbInputBackend(
                 displayId
             ) == true
         ) return true
-        if (adbManager.sendHidPointerClick(button)) return true
         val cmd = if (button == 2) {
             // Secondary / Right Click: context menu key or tap
             "${inputPrefix("keyboard", displayId)} keyevent ${KeyEvent.KEYCODE_MENU}"
@@ -162,32 +166,25 @@ class AdbInputBackend(
 
     override fun sendScroll(dx: Float, dy: Float, displayId: Int): Boolean {
         if (!isAvailable) return false
-        val totalX = scrollRemainderX - dx
-        val totalY = scrollRemainderY - dy
-        val horizontalWheel = totalX.toInt()
-        val verticalWheel = totalY.toInt()
-        scrollRemainderX = totalX - horizontalWheel
-        scrollRemainderY = totalY - verticalWheel
-        if (adbManager.sendHidScroll(horizontalWheel, verticalWheel)) return true
-
-        // Invert dy for natural swipe scroll simulation
         val startX = cursorX.toInt()
         val startY = cursorY.toInt()
         val endX = (cursorX + dx * 2f).coerceIn(0f, displayWidth - 1f).toInt()
         val endY = (cursorY - dy * 2f).coerceIn(0f, displayHeight - 1f).toInt()
+
+        if (MiniDexAccessibilityService.instance?.dispatchScroll(
+                cursorX,
+                cursorY,
+                dx * 2f,
+                dy * 2f,
+                displayId
+            ) == true
+        ) return true
 
         val cmd = "${inputPrefix("touchscreen", displayId)} swipe $startX $startY $endX $endY 50"
         return adbManager.sendCommand(cmd)
     }
 
     override fun release() {
-        if (isDragging) {
-            if (!adbManager.sendHidPointerButton(1, false)) {
-                adbManager.sendCommand(
-                    "${inputPrefix("mouse", targetDisplayId)} motionevent UP ${cursorX.toInt()} ${cursorY.toInt()}"
-                )
-            }
-        }
         isDragging = false
         fakeCursor.remove()
     }
