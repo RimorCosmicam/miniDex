@@ -41,8 +41,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val activeDexDisplay: StateFlow<DexDisplayInfo> = displayManager.activeDexDisplay
     val activeBackend: StateFlow<InputBackend> = backendManager.activeBackend
-    val isShizukuRunning: StateFlow<Boolean> = backendManager.isShizukuRunning
-    val isShizukuGranted: StateFlow<Boolean> = backendManager.isShizukuPermissionGranted
+    val isAccessibilityEnabled: StateFlow<Boolean> = backendManager.isAccessibilityEnabled
+    val isBluetoothHidReady: StateFlow<Boolean> = backendManager.isBluetoothHidReady
 
     private val _currentMode = MutableStateFlow(AppMode.KEYBOARD)
     val currentMode: StateFlow<AppMode> = _currentMode.asStateFlow()
@@ -184,8 +184,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _showMacroEditor.value = visible
     }
 
-    fun requestShizukuPermission() {
-        backendManager.requestShizukuPermission()
+    fun openAccessibilitySettings() {
+        backendManager.openAccessibilitySettings()
+    }
+
+    fun openBluetoothSettings() {
+        backendManager.openBluetoothSettings()
+    }
+
+    fun refreshBackend() {
+        viewModelScope.launch {
+            backendManager.refreshBackend()
+        }
     }
 
     override fun onCleared() {

@@ -44,10 +44,11 @@ import com.minidex.app.ui.theme.toColor
 fun SettingsView(
     preferences: UserPreferences,
     dexDisplayInfo: DexDisplayInfo,
-    isShizukuRunning: Boolean,
-    isShizukuGranted: Boolean,
+    isAccessibilityEnabled: Boolean,
+    isBluetoothHidReady: Boolean,
     activeBackendName: String,
-    onRequestShizukuPermission: () -> Unit,
+    onOpenAccessibilitySettings: () -> Unit,
+    onOpenBluetoothSettings: () -> Unit,
     onUpdatePreferences: ((UserPreferences) -> UserPreferences) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -63,38 +64,65 @@ fun SettingsView(
     ) {
         // Section: DeX Status & Input Backend
         SettingsCard(title = "DEX & INPUT ENGINE") {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = if (dexDisplayInfo.isConnected) "DeX: Connected (Display #${dexDisplayInfo.displayId})" else "DeX: Disconnected / Standalone",
-                        color = if (dexDisplayInfo.isConnected) colors.accent else colors.textSecondary,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Active: $activeBackendName",
-                        color = colors.textSecondary,
-                        fontSize = 9.sp
-                    )
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = if (dexDisplayInfo.isConnected) "DeX: Connected (#${dexDisplayInfo.displayId})" else "DeX: Standalone / Cover",
+                            color = if (dexDisplayInfo.isConnected) colors.accent else colors.textSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Backend: $activeBackendName",
+                            color = colors.textSecondary,
+                            fontSize = 9.sp
+                        )
+                    }
                 }
 
-                if (!isShizukuGranted) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    // Accessibility Quick Toggle
                     Box(
                         modifier = Modifier
+                            .weight(1f)
                             .clip(RoundedCornerShape(6.dp))
-                            .background(colors.accent.copy(alpha = 0.2f))
-                            .border(1.dp, colors.accent, RoundedCornerShape(6.dp))
-                            .clickable { onRequestShizukuPermission() }
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .background(if (isAccessibilityEnabled) colors.accent.copy(alpha = 0.2f) else colors.surfaceElevated)
+                            .border(1.dp, if (isAccessibilityEnabled) colors.accent else colors.border.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                            .clickable { onOpenAccessibilitySettings() }
+                            .padding(vertical = 5.dp),
+                        contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (isShizukuRunning) "Grant Shizuku" else "Shizuku Off",
-                            color = colors.accent,
-                            fontSize = 9.sp,
+                            text = if (isAccessibilityEnabled) "✓ Accessibility Active" else "Enable Accessibility",
+                            color = if (isAccessibilityEnabled) colors.accent else colors.textPrimary,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    // Bluetooth HID Quick Toggle
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (isBluetoothHidReady) colors.accent.copy(alpha = 0.2f) else colors.surfaceElevated)
+                            .border(1.dp, if (isBluetoothHidReady) colors.accent else colors.border.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                            .clickable { onOpenBluetoothSettings() }
+                            .padding(vertical = 5.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (isBluetoothHidReady) "✓ Bluetooth HID Ready" else "Pair Bluetooth HID",
+                            color = if (isBluetoothHidReady) colors.accent else colors.textPrimary,
+                            fontSize = 8.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }

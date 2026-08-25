@@ -12,6 +12,7 @@
   <a href="https://github.com/RimorCosmicam/miniDex/actions/workflows/build.yml"><img src="https://github.com/RimorCosmicam/miniDex/actions/workflows/build.yml/badge.svg" alt="Build Status"></a>
   <img src="https://img.shields.io/badge/Platform-Android%2014%2B%20%7C%20One%20UI-00E5FF" alt="Android 14+">
   <img src="https://img.shields.io/badge/Target-Galaxy%20Z%20Flip7-00FFA3" alt="Target Z Flip7">
+  <img src="https://img.shields.io/badge/Architecture-Zero--Shizuku%20%7C%20Native%20HID-FF007F" alt="Zero Shizuku">
 </p>
 
 ---
@@ -59,13 +60,12 @@ The **cover screen is the product**. MiniDex is crafted around the physical geom
   - **Two-Finger Tap**: Right Click
   - **Tactile Haptic Feedback**: Crisp physical-feeling click vibrations on tap and drag.
 
-### 🖥️ Smart DeX Display Detection & Input Backends
-- **Auto-Discovery**: Automatically listens to `DisplayManager` for external presentation monitors, HDMI/DP displays, or wireless DeX sessions.
-- **Display Targeting**: Injects key and motion events explicitly tagged with the target DeX `displayId`.
-- **Injection Backends**:
-  1. **Shizuku Privileged Backend** (*Recommended for DeX direct hardware injection*): Uses `IInputManager` binder with `InputEvent.setDisplayId` to send low-level events straight to DeX.
-  2. **Virtual Device Framework** (Android 13+).
-  3. **Simulator / Fallback Backend**: Safe local testing mode.
+### ⚡ 100% Native, Zero-Disconnect Input Architecture
+No unstable ADB or wireless debug bridges. MiniDex operates purely through standard Android subsystems:
+1. **Native Bluetooth HID Profile**: Acts as a real hardware Bluetooth Keyboard & Mouse directly to the DeX session. Zero latency, 100% hardware scancode fidelity.
+2. **Native Accessibility Service**: Dispatches mouse clicks, drags, swipes, and shortcuts reliably with zero disconnects.
+3. **Virtual Device Framework** (Android 13+).
+4. **Simulator / Test Backend**: Standalone local testing mode.
 
 ---
 
@@ -83,11 +83,10 @@ To launch MiniDex on the Z Flip cover screen:
 4. Enable **MiniDex** in the widget apps list.
 5. Fold your device, swipe to the MultiStar widget on FlexWindow, and launch MiniDex!
 
-### 3. Shizuku Setup (For Privileged DeX Event Injection)
-Because Android isolates input injection across different displays for security, MiniDex uses Shizuku to inject real hardware `KeyEvent` and `MotionEvent` instances into the DeX external display without requiring root:
-1. Install [Shizuku](https://shizuku.rikka.app/) from Google Play or GitHub.
-2. Start Shizuku via **Wireless Debugging** (Settings → Developer Options → Wireless Debugging) or ADB.
-3. Open MiniDex, switch to **SETTINGS** page, and tap **Grant Shizuku**.
+### 3. One-Time Input Setup
+MiniDex connects stably through either:
+- **Accessibility Service** (*Instant & Automatic*): Open MiniDex Settings → Tap **Enable Accessibility** → Toggle MiniDex ON.
+- **Bluetooth HID** (*Hardware Emulation*): Open MiniDex Settings → Tap **Pair Bluetooth HID** → Connect.
 
 ---
 
@@ -130,12 +129,16 @@ miniDex/
 ├── Icon/                                # High-resolution source icons
 ├── app/
 │   ├── src/main/
-│   │   ├── AndroidManifest.xml          # Samsung cover screen & Shizuku manifest entries
+│   │   ├── AndroidManifest.xml          # Samsung cover screen & Accessibility declarations
 │   │   ├── java/com/minidex/app/
 │   │   │   ├── data/                    # DataStore preferences & Macro repository
 │   │   │   ├── dex/                     # DexDisplayManager (DisplayManager listener & heuristic detection)
 │   │   │   ├── domain/model/            # Modifiers, KeyActions, Macros, Touchpad gestures
-│   │   │   ├── input/                   # InputBackend interface, ShizukuBackend, VirtualDevice, Fallback
+│   │   │   ├── input/
+│   │   │   │   ├── accessibility/       # MiniDexAccessibilityService (Native gesture & click dispatch)
+│   │   │   │   ├── BluetoothHidInputBackend.kt # Native Bluetooth HID Keyboard & Mouse emulation
+│   │   │   │   ├── AccessibilityInputBackend.kt # Zero-disconnect Accessibility input backend
+│   │   │   │   └── InputBackendManager.kt # Dynamic coordinator
 │   │   │   ├── ui/
 │   │   │   │   ├── components/          # KeyButton, ModeSwitcherButton, PageBar, SpecialRow, Haptics
 │   │   │   │   ├── keyboard/            # QwertyKeyboard, SymbolKeyboard, NavKeyboard, MacropadView
@@ -146,7 +149,7 @@ miniDex/
 │   │   └── res/                         # App icon mipmaps, drawables, styles, and themes
 │   └── build.gradle.kts
 ├── gradle/
-│   ├── libs.versions.toml               # Version catalog (Compose BOM, Kotlin 2.0, Shizuku)
+│   ├── libs.versions.toml               # Version catalog (Compose BOM, Kotlin 2.0)
 │   └── wrapper/                         # Gradle 8.11.1 wrapper
 ├── .github/workflows/                   # Automated build & release workflows
 └── README.md

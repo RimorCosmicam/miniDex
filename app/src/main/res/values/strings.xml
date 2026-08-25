@@ -8,4 +8,5 @@
     <string name="page_nav">NAV</string>
     <string name="page_macros">MACROS</string>
     <string name="page_settings">SETTINGS</string>
+    <string name="accessibility_description">Enables MiniDex to dispatch mouse gestures, clicks, scrolls, and key actions directly to Samsung DeX without external pairing or disconnects.</string>
 </resources>

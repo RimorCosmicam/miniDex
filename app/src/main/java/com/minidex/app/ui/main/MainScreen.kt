@@ -47,8 +47,8 @@ fun MainScreen(viewModel: MainViewModel) {
     val macros by viewModel.macros.collectAsState()
     val activeDexDisplay by viewModel.activeDexDisplay.collectAsState()
     val activeBackend by viewModel.activeBackend.collectAsState()
-    val isShizukuRunning by viewModel.isShizukuRunning.collectAsState()
-    val isShizukuGranted by viewModel.isShizukuGranted.collectAsState()
+    val isAccessibilityEnabled by viewModel.isAccessibilityEnabled.collectAsState()
+    val isBluetoothHidReady by viewModel.isBluetoothHidReady.collectAsState()
     val showMacroEditor by viewModel.showMacroEditor.collectAsState()
 
     MiniDexTheme(
@@ -170,10 +170,11 @@ fun MainScreen(viewModel: MainViewModel) {
                                             SettingsView(
                                                 preferences = preferences,
                                                 dexDisplayInfo = activeDexDisplay,
-                                                isShizukuRunning = isShizukuRunning,
-                                                isShizukuGranted = isShizukuGranted,
+                                                isAccessibilityEnabled = isAccessibilityEnabled,
+                                                isBluetoothHidReady = isBluetoothHidReady,
                                                 activeBackendName = activeBackend.name,
-                                                onRequestShizukuPermission = { viewModel.requestShizukuPermission() },
+                                                onOpenAccessibilitySettings = { viewModel.openAccessibilitySettings() },
+                                                onOpenBluetoothSettings = { viewModel.openBluetoothSettings() },
                                                 onUpdatePreferences = { viewModel.updatePreferences(it) }
                                             )
                                         }
