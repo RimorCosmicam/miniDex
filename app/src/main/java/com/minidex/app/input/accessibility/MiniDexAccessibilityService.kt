@@ -49,18 +49,20 @@ class MiniDexAccessibilityService : AccessibilityService() {
      */
     fun findFocusedNodeOnDisplay(displayId: Int = -1): AccessibilityNodeInfo? {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val windows = windowsOnAllDisplays
-            val dexWindows = if (displayId >= 0) {
-                windows[displayId] ?: windows.values.flatten()
-            } else {
-                windows.values.flatten()
-            }
-
-            for (window in dexWindows) {
-                val root = window.root ?: continue
-                val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-                    ?: root.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
-                if (focused != null) return focused
+            val allDisplayWindows = windowsOnAllDisplays
+            if (allDisplayWindows.size() > 0) {
+                for (i in 0 until allDisplayWindows.size()) {
+                    val currentDisplayId = allDisplayWindows.keyAt(i)
+                    if (displayId < 0 || currentDisplayId == displayId) {
+                        val windowList = allDisplayWindows.valueAt(i)
+                        for (window in windowList) {
+                            val root = window.root ?: continue
+                            val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+                                ?: root.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
+                            if (focused != null) return focused
+                        }
+                    }
+                }
             }
         }
 
@@ -121,6 +123,8 @@ class MiniDexAccessibilityService : AccessibilityService() {
                             putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, newText)
                         }
                         node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+                    } else {
+                        false
                     }
                 } else {
                     false
