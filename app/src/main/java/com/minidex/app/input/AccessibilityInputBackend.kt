@@ -2,11 +2,12 @@ package com.minidex.app.input
 
 import android.content.Context
 import android.util.Log
+import android.view.KeyEvent
 import com.minidex.app.input.accessibility.MiniDexAccessibilityService
 
 /**
  * Stable, zero-disconnect input backend leveraging Android's AccessibilityService framework.
- * Dispatches clicks, drags, swipes, scrolls, and shortcuts reliably without requiring root, ADB, or Shizuku.
+ * Dispatches clicks, drags, swipes, scrolls, and text actions directly to the focused DeX app window.
  */
 class AccessibilityInputBackend(private val context: Context) : InputBackend {
 
@@ -37,7 +38,8 @@ class AccessibilityInputBackend(private val context: Context) : InputBackend {
     }
 
     override fun sendKeyDown(keyCode: Int, metaState: Int, displayId: Int): Boolean {
-        return true
+        val service = MiniDexAccessibilityService.instance ?: return false
+        return service.handleSpecialKey(keyCode, displayId)
     }
 
     override fun sendKeyUp(keyCode: Int, metaState: Int, displayId: Int): Boolean {
@@ -45,12 +47,13 @@ class AccessibilityInputBackend(private val context: Context) : InputBackend {
     }
 
     override fun sendKeyPress(keyCode: Int, metaState: Int, displayId: Int): Boolean {
-        // Can be combined with Virtual IME or system key dispatch
-        return true
+        val service = MiniDexAccessibilityService.instance ?: return false
+        return service.handleSpecialKey(keyCode, displayId)
     }
 
     override fun sendText(text: String, displayId: Int): Boolean {
-        return true
+        val service = MiniDexAccessibilityService.instance ?: return false
+        return service.injectText(text, displayId)
     }
 
     override fun sendPointerMove(dx: Float, dy: Float, displayId: Int): Boolean {

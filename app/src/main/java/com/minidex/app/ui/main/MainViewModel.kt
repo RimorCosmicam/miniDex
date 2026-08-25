@@ -80,6 +80,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun handleCharPress(char: Char, keyCode: Int) {
         val meta = _modifierState.value.toMetaState()
+        val text = if (_modifierState.value.shift.isActive) char.uppercase() else char.toString()
+        activeBackend.value.sendText(text, targetDisplayId)
         activeBackend.value.sendKeyPress(keyCode, meta, targetDisplayId)
         _modifierState.value = _modifierState.value.consumeLatched()
         hapticManager.performHaptic(userPreferences.value.hapticStrength)

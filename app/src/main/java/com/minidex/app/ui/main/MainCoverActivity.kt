@@ -42,4 +42,16 @@ class MainCoverActivity : ComponentActivity() {
             MainScreen(viewModel = viewModel)
         }
     }
+
+    override fun onResume() {
+        super.onResume()
+        viewModel.refreshBackend()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            viewModel.refreshBackend()
+        }
+    }
 }
