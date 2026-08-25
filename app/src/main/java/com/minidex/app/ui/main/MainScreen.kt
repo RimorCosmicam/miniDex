@@ -46,6 +46,7 @@ fun MainScreen(viewModel: MainViewModel) {
     val modifierState by viewModel.modifierState.collectAsState()
     val macros by viewModel.macros.collectAsState()
     val activeDexDisplay by viewModel.activeDexDisplay.collectAsState()
+    val availableDisplays by viewModel.availableDisplays.collectAsState()
     val activeBackend by viewModel.activeBackend.collectAsState()
     val isAccessibilityEnabled by viewModel.isAccessibilityEnabled.collectAsState()
     val isImeEnabled by viewModel.isImeEnabled.collectAsState()
@@ -170,6 +171,7 @@ fun MainScreen(viewModel: MainViewModel) {
                                             SettingsView(
                                                 preferences = preferences,
                                                 dexDisplayInfo = activeDexDisplay,
+                                                availableDisplays = availableDisplays,
                                                 isAccessibilityEnabled = isAccessibilityEnabled,
                                                 isImeEnabled = isImeEnabled,
                                                 activeBackendName = activeBackend.name,

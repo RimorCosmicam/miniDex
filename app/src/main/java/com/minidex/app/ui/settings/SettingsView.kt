@@ -3,6 +3,7 @@ package com.minidex.app.ui.settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Slider
@@ -43,6 +45,7 @@ import com.minidex.app.ui.theme.toColor
 fun SettingsView(
     preferences: UserPreferences,
     dexDisplayInfo: DexDisplayInfo,
+    availableDisplays: List<DexDisplayInfo> = emptyList(),
     isAccessibilityEnabled: Boolean,
     isImeEnabled: Boolean,
     activeBackendName: String,
@@ -68,6 +71,83 @@ fun SettingsView(
                     value = if (dexDisplayInfo.isConnected) "Connected (#${dexDisplayInfo.displayId})" else "Not detected",
                     valueColor = if (dexDisplayInfo.isConnected) colors.accent else colors.textSecondary
                 )
+
+                SettingsDivider()
+
+                // Manual Display Selector Fallback
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = "Target Display Override", color = colors.textPrimary, fontSize = 13.sp)
+                        Text(
+                            text = if (preferences.manualDisplayId == -1) "Auto (#${dexDisplayInfo.displayId})" else "Manual (#${preferences.manualDisplayId})",
+                            color = colors.accent,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    // Display Selection Pills
+                    val displayScrollState = rememberScrollState()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(displayScrollState),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        // Auto Pill
+                        val isAutoSelected = preferences.manualDisplayId == -1
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (isAutoSelected) colors.accent.copy(alpha = 0.25f) else colors.surfaceElevated)
+                                .border(1.dp, if (isAutoSelected) colors.accent else colors.border.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                                .clickable { onUpdatePreferences { it.copy(manualDisplayId = -1) } }
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = "Auto",
+                                color = if (isAutoSelected) colors.accent else colors.textSecondary,
+                                fontSize = 11.sp,
+                                fontWeight = if (isAutoSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+
+                        // Explicit Display options
+                        val displaysToShow = if (availableDisplays.isNotEmpty()) availableDisplays else listOf(
+                            DexDisplayInfo(displayId = 0, name = "Display 0 (Main)", width = 1080, height = 2640, refreshRate = 120f, isPresentation = false, isExternal = false, isConnected = true),
+                            DexDisplayInfo(displayId = 1, name = "Display 1 (Cover)", width = 720, height = 748, refreshRate = 60f, isPresentation = false, isExternal = true, isConnected = true),
+                            DexDisplayInfo(displayId = 2, name = "Display 2 (External DeX)", width = 1920, height = 1080, refreshRate = 60f, isPresentation = true, isExternal = true, isConnected = true)
+                        )
+
+                        displaysToShow.forEach { d ->
+                            val isThisSelected = preferences.manualDisplayId == d.displayId
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (isThisSelected) colors.accent.copy(alpha = 0.25f) else colors.surfaceElevated)
+                                    .border(1.dp, if (isThisSelected) colors.accent else colors.border.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                                    .clickable { onUpdatePreferences { it.copy(manualDisplayId = d.displayId) } }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = "Display ${d.displayId}${if (d.name.isNotBlank()) " (${d.name.take(8)})" else ""}",
+                                    color = if (isThisSelected) colors.accent else colors.textSecondary,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isThisSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        }
+                    }
+                }
 
                 SettingsDivider()
 

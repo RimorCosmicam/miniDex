@@ -40,6 +40,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         .stateIn(viewModelScope, SharingStarted.Eagerly, macroRepository.defaultMacros)
 
     val activeDexDisplay: StateFlow<DexDisplayInfo> = displayManager.activeDexDisplay
+    val availableDisplays: StateFlow<List<DexDisplayInfo>> = displayManager.availableDisplays
     val activeBackend: StateFlow<InputBackend> = backendManager.activeBackend
     val isAccessibilityEnabled: StateFlow<Boolean> = backendManager.isAccessibilityEnabled
     val isImeEnabled: StateFlow<Boolean> = backendManager.isImeEnabled
