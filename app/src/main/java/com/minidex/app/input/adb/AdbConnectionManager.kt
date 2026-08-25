@@ -269,6 +269,7 @@ class AdbConnectionManager(
                         shizukuProcess = process
                         shizukuOutputStream = process.outputStream
                         grantOverlayPermission(useShizuku = true)
+                        startCursorTransport(useShizuku = true)
                         _status.value = AdbConnectionStatus.CONNECTED
                         _statusMessage.value = "Connected via Shizuku"
                         isConnecting.set(false)
@@ -291,6 +292,7 @@ class AdbConnectionManager(
             Log.i(TAG, "ADB shell test output: $testOutput")
 
             grantOverlayPermission(useShizuku = false)
+            startCursorTransport(useShizuku = false)
 
             _status.value = AdbConnectionStatus.CONNECTED
             _statusMessage.value = "Connected to ADB"

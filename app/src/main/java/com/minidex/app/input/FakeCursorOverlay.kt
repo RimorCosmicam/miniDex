@@ -15,6 +15,7 @@ import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
+import com.minidex.app.input.accessibility.MiniDexAccessibilityService
 
 /** A non-interactive cursor rendered on the target display independently of Android's pointer icon. */
 class FakeCursorOverlay(private val appContext: Context) {
@@ -29,16 +30,22 @@ class FakeCursorOverlay(private val appContext: Context) {
     private var cursorView: View? = null
     private var layoutParams: WindowManager.LayoutParams? = null
     private var activeDisplayId = -1
+    private var activeAccessibilityLayer = false
 
     fun showAt(displayId: Int, x: Float, y: Float) {
         if (displayId < 0) return
         mainHandler.post {
-            if (!Settings.canDrawOverlays(appContext)) {
+            val accessibilityService = MiniDexAccessibilityService.instance
+            if (accessibilityService == null && !Settings.canDrawOverlays(appContext)) {
                 Log.w(TAG, "Overlay permission has not been granted")
                 return@post
             }
-            if (activeDisplayId != displayId || cursorView == null) {
-                attachToDisplay(displayId)
+            val wantsAccessibilityLayer = accessibilityService != null
+            if (activeDisplayId != displayId ||
+                cursorView == null ||
+                activeAccessibilityLayer != wantsAccessibilityLayer
+            ) {
+                attachToDisplay(displayId, accessibilityService)
             }
             val view = cursorView ?: return@post
             val params = layoutParams ?: return@post
@@ -53,14 +60,23 @@ class FakeCursorOverlay(private val appContext: Context) {
         mainHandler.post { removeNow() }
     }
 
-    private fun attachToDisplay(displayId: Int) {
+    private fun attachToDisplay(
+        displayId: Int,
+        accessibilityService: MiniDexAccessibilityService?
+    ) {
         removeNow()
         val displayManager = appContext.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
         val display = displayManager.getDisplay(displayId) ?: return
-        val displayContext = appContext.createDisplayContext(display)
+        val baseContext = accessibilityService ?: appContext
+        val windowType = if (accessibilityService != null) {
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+        } else {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        }
+        val displayContext = baseContext.createDisplayContext(display)
         val windowContext = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             displayContext.createWindowContext(
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                windowType,
                 null
             )
         } else {
@@ -71,7 +87,7 @@ class FakeCursorOverlay(private val appContext: Context) {
         val params = WindowManager.LayoutParams(
             CURSOR_WIDTH,
             CURSOR_HEIGHT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            windowType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
@@ -87,9 +103,14 @@ class FakeCursorOverlay(private val appContext: Context) {
                 cursorView = view
                 layoutParams = params
                 activeDisplayId = displayId
-                Log.i(TAG, "Fake cursor attached to display $displayId")
+                activeAccessibilityLayer = accessibilityService != null
+                val layer = if (accessibilityService != null) "accessibility" else "application"
+                Log.i(TAG, "Fake cursor attached to display $displayId on $layer overlay layer")
             }
-            .onFailure { Log.e(TAG, "Could not attach fake cursor to display $displayId", it) }
+            .onFailure {
+                Log.e(TAG, "Could not attach fake cursor to display $displayId", it)
+                if (accessibilityService != null) attachToDisplay(displayId, null)
+            }
     }
 
     private fun removeNow() {
@@ -99,6 +120,7 @@ class FakeCursorOverlay(private val appContext: Context) {
         cursorView = null
         layoutParams = null
         activeDisplayId = -1
+        activeAccessibilityLayer = false
     }
 
     private class CursorView(context: Context) : View(context) {
