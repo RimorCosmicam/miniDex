@@ -7,6 +7,7 @@ import android.provider.Settings
 import android.util.Log
 import android.view.accessibility.AccessibilityManager
 import android.view.inputmethod.InputMethodManager
+import android.widget.Toast
 import com.minidex.app.input.accessibility.MiniDexAccessibilityService
 import com.minidex.app.input.adb.AdbConnectionManager
 import com.minidex.app.input.adb.AdbConnectionStatus
@@ -99,22 +100,23 @@ class InputBackendManager(
     }
 
     fun launchSamsungDexTouchpad() {
-        try {
-            // Attempt 1: Samsung Desktop Launcher Touchpad Action
-            val intent = Intent("com.sec.android.app.desktoplauncher.action.SHOW_TOUCHPAD").apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
-            context.sendBroadcast(intent)
-        } catch (_: Exception) {}
+        if (adbManager.status.value != AdbConnectionStatus.CONNECTED) {
+            Toast.makeText(context, "Connect Wireless ADB first", Toast.LENGTH_SHORT).show()
+            return
+        }
 
-        try {
-            // Attempt 2: Direct component launch for Samsung DeX Pad / SystemUI Touchpad
-            val intent = Intent().apply {
-                setClassName("com.sec.android.app.desktoplauncher", "com.sec.android.app.desktoplauncher.TouchPadActivity")
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        scope.launch {
+            val output = adbManager.executeShellSync(
+                "am start -n com.android.systemui/.dextouchpad.activity.TouchpadActivity"
+            )
+            if (output.contains("Error", ignoreCase = true) ||
+                output.contains("Exception", ignoreCase = true)
+            ) {
+                launch(Dispatchers.Main) {
+                    Toast.makeText(context, "Samsung touchpad is unavailable on this device", Toast.LENGTH_SHORT).show()
+                }
             }
-            context.startActivity(intent)
-        } catch (_: Exception) {}
+        }
     }
 
     private fun checkAccessibilityServiceConfigured(): Boolean {

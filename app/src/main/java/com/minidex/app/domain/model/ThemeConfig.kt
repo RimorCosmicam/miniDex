@@ -4,19 +4,19 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 enum class ThemeVariant(val displayName: String) {
-    CYBER_OLED("Cyber OLED"),
-    MIDNIGHT_SLATE("Midnight Slate"),
-    RETRO_AMBER("Retro Amber"),
-    VAPOR_PURPLE("Vapor Purple")
+    CYBER_OLED("OLED Black"),
+    MIDNIGHT_SLATE("Midnight Blue"),
+    RETRO_AMBER("Warm Graphite"),
+    VAPOR_PURPLE("Soft Plum")
 }
 
 @Serializable
 enum class AccentColor(val displayName: String, val hex: String) {
-    NEON_CYAN("Neon Cyan", "#00E5FF"),
-    CYBER_MINT("Cyber Mint", "#00FFA3"),
-    ELECTRIC_PINK("Electric Pink", "#FF007F"),
-    AMBER_GOLD("Amber Gold", "#FFB300"),
-    VIOLET_GLOW("Violet Glow", "#B388FF")
+    NEON_CYAN("Sky", "#67D4FF"),
+    CYBER_MINT("Mint", "#62D6A7"),
+    ELECTRIC_PINK("Rose", "#FF7597"),
+    AMBER_GOLD("Amber", "#FFB45C"),
+    VIOLET_GLOW("Lavender", "#A995FF")
 }
 
 @Serializable

@@ -201,11 +201,12 @@ fun MainScreen(viewModel: MainViewModel) {
                     }
                 }
 
-                // Bottom Anchor Bar: houses the persistent Mode Switcher in the camera nook
+                // Keep the mode switch clear of rounded corners and system navigation overlays.
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(46.dp),
+                        .height(58.dp)
+                        .padding(start = 12.dp, end = 12.dp, bottom = 10.dp),
                     horizontalArrangement = Arrangement.Start,
                     verticalAlignment = Alignment.CenterVertically
                 ) {

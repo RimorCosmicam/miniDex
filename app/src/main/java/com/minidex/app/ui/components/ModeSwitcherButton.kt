@@ -31,7 +31,7 @@ import com.minidex.app.domain.model.AppMode
 import com.minidex.app.ui.theme.LocalMiniDexColors
 
 /**
- * Persistent switch button nestled in the bottom-left camera safe space of the Z Flip7 cover screen.
+ * Persistent mode switch kept inside the cover screen's system-safe area.
  * Tapping instantaneously toggles Keyboard ⇄ Touchpad.
  */
 @Composable

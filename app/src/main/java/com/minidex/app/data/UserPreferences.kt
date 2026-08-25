@@ -1,6 +1,7 @@
 package com.minidex.app.data
 
 import com.minidex.app.domain.model.AccentColor
+import com.minidex.app.domain.model.CursorMode
 import com.minidex.app.domain.model.HapticStrength
 import com.minidex.app.domain.model.KeyHeightLevel
 import com.minidex.app.domain.model.ThemeVariant
@@ -21,6 +22,7 @@ data class UserPreferences(
     val scrollSensitivity: Float = 1.0f,
     val naturalScrolling: Boolean = false,
     val tapToClick: Boolean = true,
+    val cursorMode: CursorMode = CursorMode.AUTO_NATIVE,
     val preferredBackend: String = "AUTO", // AUTO, SHIZUKU, VIRTUAL_DEVICE, FALLBACK
     val manualDisplayId: Int = -1, // -1 = auto detect
     val adbAutoConnect: Boolean = true,

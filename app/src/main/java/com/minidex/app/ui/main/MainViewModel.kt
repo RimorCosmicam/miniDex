@@ -19,12 +19,16 @@ import com.minidex.app.input.InputBackendManager
 import com.minidex.app.input.adb.AdbConnectionStatus
 import com.minidex.app.ui.components.HapticFeedbackManager
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -76,13 +80,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
     init {
+        viewModelScope.launch {
+            userPreferences.collect { preferences ->
+                backendManager.adbBackend.setCursorMode(preferences.cursorMode)
+                displayManager.setManualOverride(preferences.manualDisplayId)
+            }
+        }
+
         // Auto-start mDNS discovery and auto-connect if enabled in preferences
         viewModelScope.launch {
             backendManager.adbManager.startMdnsDiscovery()
 
-            if (userPreferences.value.adbAutoConnect) {
-                val defaultPort = userPreferences.value.adbPort
-                backendManager.adbManager.connect("127.0.0.1", defaultPort)
+            val preferences = preferencesRepository.userPreferencesFlow.first()
+            if (preferences.adbAutoConnect) {
+                // Wireless Debugging advertises a randomized TLS port. Port 5555
+                // is not a valid fallback and can leave a blocking connect alive.
+                val connectPort = withTimeoutOrNull(8_000) {
+                    discoveredConnectPort.filterNotNull().first()
+                }
+                if (connectPort != null) {
+                    val host = backendManager.adbManager.mdnsDiscovery.discoveredHost.value
+                    backendManager.adbManager.connect(host, connectPort)
+                }
             }
         }
     }
@@ -104,10 +123,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun handleCharPress(char: Char, keyCode: Int) {
-        val meta = _modifierState.value.toMetaState()
-        val text = if (_modifierState.value.shift.isActive) char.uppercase() else char.toString()
-        activeBackend.value.sendText(text, targetDisplayId)
-        activeBackend.value.sendKeyPress(keyCode, meta, targetDisplayId)
+        val modifiers = _modifierState.value
+        val meta = modifiers.toMetaState()
+        val isShortcut = modifiers.ctrl.isActive || modifiers.alt.isActive || modifiers.meta.isActive
+        if (isShortcut) {
+            activeBackend.value.sendKeyPress(keyCode, meta, targetDisplayId)
+        } else {
+            val text = if (modifiers.shift.isActive) char.uppercase() else char.toString()
+            activeBackend.value.sendText(text, targetDisplayId)
+        }
         _modifierState.value = _modifierState.value.consumeLatched()
         hapticManager.performHaptic(userPreferences.value.hapticStrength)
     }
@@ -176,23 +200,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun handlePointerMove(dx: Float, dy: Float) {
+        syncAdbPointerBounds()
         activeBackend.value.sendPointerMove(dx, dy, targetDisplayId)
     }
 
     fun handlePointerDown(button: Int) {
+        syncAdbPointerBounds()
         activeBackend.value.sendPointerDown(button, targetDisplayId)
     }
 
     fun handlePointerUp(button: Int) {
+        syncAdbPointerBounds()
         activeBackend.value.sendPointerUp(button, targetDisplayId)
     }
 
     fun handlePointerClick(button: Int) {
+        syncAdbPointerBounds()
         activeBackend.value.sendPointerClick(button, targetDisplayId)
     }
 
     fun handleScroll(dx: Float, dy: Float) {
+        syncAdbPointerBounds()
         activeBackend.value.sendScroll(dx, dy, targetDisplayId)
+    }
+
+    private fun syncAdbPointerBounds() {
+        val display = availableDisplays.value.firstOrNull { it.displayId == targetDisplayId }
+            ?: activeDexDisplay.value
+        backendManager.adbBackend.setDisplayBounds(display.width, display.height)
     }
 
     fun updatePreferences(transform: (UserPreferences) -> UserPreferences) {
@@ -230,7 +265,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun connectAdbDirect(port: Int) {
         viewModelScope.launch {
-            backendManager.adbManager.connect("127.0.0.1", port)
+            val host = backendManager.adbManager.mdnsDiscovery.discoveredHost.value
+            backendManager.adbManager.connect(host, port)
         }
     }
 

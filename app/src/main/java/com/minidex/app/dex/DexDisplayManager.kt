@@ -103,21 +103,12 @@ class DexDisplayManager(
     }
 
     private fun findBestDexCandidate(displays: List<DexDisplayInfo>): DexDisplayInfo? {
-        // Priority 1: Explicit DeX name matching
-        displays.firstOrNull { it.name.contains("DeX", ignoreCase = true) }?.let { return it }
-
-        // Priority 2: External Presentation display (standard for DeX monitor)
-        displays.firstOrNull { it.isPresentation && it.isExternal }?.let { return it }
-
-        // Priority 3: External monitor with desktop resolution (>= 1280px and not cover screen)
-        displays.firstOrNull {
-            it.isExternal && (it.width >= 1280 || it.height >= 1280) && !it.name.contains("cover", ignoreCase = true) && !it.name.contains("sub", ignoreCase = true)
-        }?.let { return it }
-
-        // Priority 4: Highest display ID that isn't display 0
-        displays.filter { it.isExternal }.maxByOrNull { it.displayId }?.let { return it }
-
-        return null
+        // Samsung creates DeX last. This also handles glasses whose advertised
+        // name is just the product name (for example "Air") rather than "DeX".
+        return displays
+            .asSequence()
+            .filter { it.isExternal && it.isConnected }
+            .maxByOrNull { it.displayId }
     }
 
     fun release() {

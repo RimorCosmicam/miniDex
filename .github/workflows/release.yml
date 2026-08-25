@@ -25,6 +25,9 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Install pinned Android NDK
+        run: sdkmanager "ndk;27.0.12077973"
+
       - name: Build Release APK
         run: ./gradlew assembleRelease --stacktrace
 

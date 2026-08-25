@@ -30,10 +30,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.minidex.app.data.UserPreferences
 import com.minidex.app.domain.model.AccentColor
+import com.minidex.app.domain.model.CursorMode
 import com.minidex.app.domain.model.DexDisplayInfo
 import com.minidex.app.domain.model.HapticStrength
 import com.minidex.app.domain.model.KeyHeightLevel
@@ -77,26 +79,27 @@ fun SettingsView(
 
                 SettingsDivider()
 
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column {
                         Text(text = "Auto-Connect on Launch", color = colors.textPrimary, fontSize = 13.sp)
                         Text(text = "Connects to localhost on start", color = colors.textSecondary, fontSize = 10.sp)
                     }
-                    Switch(
-                        checked = preferences.adbAutoConnect,
-                        onCheckedChange = { checked -> onUpdatePreferences { it.copy(adbAutoConnect = checked) } },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = colors.accent,
-                            uncheckedTrackColor = colors.surfaceElevated
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                        Switch(
+                            checked = preferences.adbAutoConnect,
+                            onCheckedChange = { checked -> onUpdatePreferences { it.copy(adbAutoConnect = checked) } },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = colors.accent,
+                                uncheckedTrackColor = colors.surfaceElevated
+                            )
                         )
-                    )
+                    }
                 }
 
                 SettingsDivider()
@@ -128,19 +131,15 @@ fun SettingsView(
                         .padding(vertical = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(text = "Target Display Override", color = colors.textPrimary, fontSize = 13.sp)
-                        Text(
-                            text = if (preferences.manualDisplayId == -1) "Auto (#${dexDisplayInfo.displayId})" else "Manual (#${preferences.manualDisplayId})",
-                            color = colors.accent,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    Text(text = "Target Display Override", color = colors.textPrimary, fontSize = 13.sp)
+                    Text(
+                        text = if (preferences.manualDisplayId == -1) "Auto (#${dexDisplayInfo.displayId})" else "Manual (#${preferences.manualDisplayId})",
+                        color = colors.accent,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
 
                     // Display Selection Pills
                     val displayScrollState = rememberScrollState()
@@ -221,8 +220,8 @@ fun SettingsView(
                 // Samsung Native Touchpad Summoner
                 SettingsClickableRow(
                     label = "Samsung Touchpad",
-                    status = "Open ↗",
-                    statusColor = colors.textSecondary,
+                    status = if (isAdbConnected) "Open ↗" else "Connect ADB first",
+                    statusColor = if (isAdbConnected) colors.accent else colors.textSecondary,
                     onClick = onLaunchSamsungDexTouchpad
                 )
             }
@@ -262,31 +261,43 @@ fun SettingsView(
 
                     SettingsDivider()
 
-                    // Theme selection with comfortable 36dp pill heights
-                    Row(
+                    // Two columns keep theme names readable on the narrow cover display.
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 2.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        ThemeVariant.entries.forEach { theme ->
-                            val isSelected = theme == preferences.themeVariant
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(34.dp)
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(if (isSelected) colors.accent.copy(alpha = 0.25f) else colors.surfaceElevated)
-                                    .border(1.dp, if (isSelected) colors.accent else colors.border.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
-                                    .clickable { onUpdatePreferences { it.copy(themeVariant = theme) } },
-                                contentAlignment = Alignment.Center
+                        ThemeVariant.entries.chunked(2).forEach { themes ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Text(
-                                    text = theme.displayName,
-                                    color = if (isSelected) colors.accent else colors.textSecondary,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                )
+                                themes.forEach { theme ->
+                                    val isSelected = theme == preferences.themeVariant
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(36.dp)
+                                            .clip(RoundedCornerShape(7.dp))
+                                            .background(if (isSelected) colors.accent.copy(alpha = 0.18f) else colors.surfaceElevated)
+                                            .border(1.dp, if (isSelected) colors.accent else colors.border.copy(alpha = 0.55f), RoundedCornerShape(7.dp))
+                                            .clickable { onUpdatePreferences { it.copy(themeVariant = theme) } },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = theme.displayName,
+                                            color = if (isSelected) colors.accent else colors.textSecondary,
+                                            fontSize = 10.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                                if (themes.size == 1) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
                             }
                         }
                     }
@@ -299,19 +310,22 @@ fun SettingsView(
             SettingsGroup(title = "KEYBOARD") {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     // Key Height
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(text = "Key Sizing", color = colors.textPrimary, fontSize = 13.sp)
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
                             KeyHeightLevel.entries.forEach { level ->
                                 val isSelected = level == preferences.keyHeightLevel
                                 Box(
                                     modifier = Modifier
+                                        .weight(1f)
                                         .clip(RoundedCornerShape(6.dp))
                                         .background(if (isSelected) colors.accent.copy(alpha = 0.25f) else colors.surfaceElevated)
                                         .border(1.dp, if (isSelected) colors.accent else colors.border.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
@@ -321,8 +335,10 @@ fun SettingsView(
                                     Text(
                                         text = level.displayName,
                                         color = if (isSelected) colors.accent else colors.textSecondary,
-                                        fontSize = 11.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        fontSize = 10.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
@@ -332,19 +348,22 @@ fun SettingsView(
                     SettingsDivider()
 
                     // Haptics
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(text = "Haptic Feedback", color = colors.textPrimary, fontSize = 13.sp)
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
                             HapticStrength.entries.forEach { strength ->
                                 val isSelected = strength == preferences.hapticStrength
                                 Box(
                                     modifier = Modifier
+                                        .weight(1f)
                                         .clip(RoundedCornerShape(6.dp))
                                         .background(if (isSelected) colors.accent.copy(alpha = 0.25f) else colors.surfaceElevated)
                                         .border(1.dp, if (isSelected) colors.accent else colors.border.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
@@ -354,8 +373,10 @@ fun SettingsView(
                                     Text(
                                         text = strength.displayName,
                                         color = if (isSelected) colors.accent else colors.textSecondary,
-                                        fontSize = 11.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        fontSize = 10.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
@@ -369,12 +390,59 @@ fun SettingsView(
         item {
             SettingsGroup(title = "TRACKPAD") {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Text(text = "Force Cursor Mode", color = colors.textPrimary, fontSize = 13.sp)
+                        Text(
+                            text = "Try each mode while moving on the pad. Changes apply immediately.",
+                            color = colors.textSecondary,
+                            fontSize = 10.sp
+                        )
+                        CursorMode.entries.forEach { mode ->
+                            val selected = preferences.cursorMode == mode
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(7.dp))
+                                    .background(if (selected) colors.accent.copy(alpha = 0.18f) else colors.surfaceElevated)
+                                    .border(
+                                        1.dp,
+                                        if (selected) colors.accent else colors.border.copy(alpha = 0.55f),
+                                        RoundedCornerShape(7.dp)
+                                    )
+                                    .clickable { onUpdatePreferences { it.copy(cursorMode = mode) } }
+                                    .padding(horizontal = 9.dp, vertical = 7.dp),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Text(
+                                    text = mode.displayName,
+                                    color = if (selected) colors.accent else colors.textPrimary,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                    maxLines = 1
+                                )
+                                Text(
+                                    text = mode.description,
+                                    color = colors.textSecondary,
+                                    fontSize = 9.sp,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+
+                    SettingsDivider()
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
                         Text(text = "Tracking Speed", color = colors.textPrimary, fontSize = 13.sp)
                         Text(text = "${"%.1f".format(preferences.pointerSensitivity)}x", color = colors.accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
@@ -390,23 +458,24 @@ fun SettingsView(
 
                     SettingsDivider()
 
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(text = "Natural Scrolling", color = colors.textPrimary, fontSize = 13.sp)
-                        Switch(
-                            checked = preferences.naturalScrolling,
-                            onCheckedChange = { checked -> onUpdatePreferences { it.copy(naturalScrolling = checked) } },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = colors.accent,
-                                uncheckedTrackColor = colors.surfaceElevated
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                            Switch(
+                                checked = preferences.naturalScrolling,
+                                onCheckedChange = { checked -> onUpdatePreferences { it.copy(naturalScrolling = checked) } },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = colors.accent,
+                                    uncheckedTrackColor = colors.surfaceElevated
+                                )
                             )
-                        )
+                        }
                     }
                 }
             }
@@ -454,15 +523,21 @@ fun SettingsRow(
     valueColor: Color
 ) {
     val colors = LocalMiniDexColors.current
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
         Text(text = label, color = colors.textPrimary, fontSize = 13.sp)
-        Text(text = value, color = valueColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        Text(
+            text = value,
+            color = valueColor,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -474,17 +549,23 @@ fun SettingsClickableRow(
     onClick: () -> Unit
 ) {
     val colors = LocalMiniDexColors.current
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(6.dp))
             .clickable { onClick() }
             .padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Text(text = label, color = colors.textPrimary, fontSize = 13.sp)
-        Text(text = status, color = statusColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        Text(
+            text = status,
+            color = statusColor,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 

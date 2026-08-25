@@ -73,21 +73,13 @@ fun AdbPairingDialog(
     var portText by remember { mutableStateOf(discoveredPairingPort?.toString() ?: "") }
     var codeText by remember { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
+    val isBusy = connectionStatus == AdbConnectionStatus.PAIRING ||
+        connectionStatus == AdbConnectionStatus.CONNECTING
 
     // Update port if mDNS detects one dynamically
     LaunchedEffect(discoveredPairingPort) {
         if (discoveredPairingPort != null && (portText.isBlank() || portText == "5555")) {
             portText = discoveredPairingPort.toString()
-        }
-    }
-
-    // Auto-submit when 6 digits are typed and port is available
-    LaunchedEffect(codeText, portText) {
-        if (codeText.length == 6) {
-            val portInt = portText.toIntOrNull() ?: discoveredPairingPort
-            if (portInt != null && portInt > 0) {
-                onPairWithCode(portInt, codeText)
-            }
         }
     }
 
@@ -258,6 +250,7 @@ fun AdbPairingDialog(
                         OutlinedTextField(
                             value = portText,
                             onValueChange = { portText = it },
+                            enabled = !isBusy,
                             label = {
                                 Text(
                                     text = if (discoveredPairingPort != null) "Auto Port: $discoveredPairingPort" else "Pairing Port",
@@ -279,6 +272,7 @@ fun AdbPairingDialog(
                         OutlinedTextField(
                             value = codeText,
                             onValueChange = { if (it.length <= 6) codeText = it },
+                            enabled = !isBusy,
                             label = { Text("6-Digit Code", fontSize = 10.sp) },
                             placeholder = { Text("123456", fontSize = 11.sp) },
                             singleLine = true,
@@ -316,7 +310,8 @@ fun AdbPairingDialog(
                                 onPairWithCode(p, codeText)
                             }
                         },
-                        enabled = codeText.length == 6 && (portText.isNotBlank() || discoveredPairingPort != null),
+                        enabled = !isBusy && codeText.length == 6 &&
+                            (portText.isNotBlank() || discoveredPairingPort != null),
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(36.dp),
@@ -348,7 +343,7 @@ fun AdbPairingDialog(
                         ) {
                             Column {
                                 Text("Shizuku Service Running", color = colors.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                Text("Tap for 1-Click Instant Connect", color = colors.textSecondary, fontSize = 10.sp)
+                                Text("Tap to authorize and connect", color = colors.textSecondary, fontSize = 10.sp)
                             }
                             Text("Connect ›", color = colors.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
@@ -362,14 +357,15 @@ fun AdbPairingDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(
+                        enabled = !isBusy && discoveredConnectPort != null,
                         onClick = {
-                            val connectPort = discoveredConnectPort ?: 5555
-                            onConnectDirect(connectPort)
+                            discoveredConnectPort?.let(onConnectDirect)
                         }
                     ) {
                         Text(
-                            text = "Direct Connect (#${discoveredConnectPort ?: 5555})",
-                            color = colors.textSecondary,
+                            text = discoveredConnectPort?.let { "Connect (#$it)" }
+                                ?: "Waiting for connect port…",
+                            color = if (discoveredConnectPort != null) colors.accent else colors.textSecondary,
                             fontSize = 11.sp
                         )
                     }

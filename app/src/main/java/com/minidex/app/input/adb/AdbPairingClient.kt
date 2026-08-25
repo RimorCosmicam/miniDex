@@ -1,57 +1,58 @@
 package com.minidex.app.input.adb
 
 import android.content.Context
+import android.os.Build
 import android.util.Log
-import dadb.AdbKeyPair
-import io.github.muntashirakon.adb.PairingConnectionCtx
+import io.github.muntashirakon.adb.AbsAdbConnectionManager
+import io.github.muntashirakon.adb.AdbStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.security.KeyFactory
-import java.security.KeyPairGenerator
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
-import java.security.spec.PKCS8EncodedKeySpec
+import java.util.concurrent.TimeUnit
 
 /**
  * Handles pairing and authentication with the on-device Wireless Debugging daemon.
  * Uses libadb-android's PairingConnectionCtx for proper SPAKE2+TLS handshake.
  */
-class AdbPairingClient(private val context: Context) {
+class AdbPairingClient(private val context: Context) : AbsAdbConnectionManager() {
 
     companion object {
         private const val TAG = "AdbPairingClient"
-        private const val KEY_FILE_PRIVATE = "minidex_adb.priv"
         private const val CERT_FILE = "minidex_adb.crt"
         private const val DEVICE_NAME = "MiniDex"
     }
 
-    // Lazy-load the persistent RSA private key and self-signed certificate
+    private val adbCrypto by lazy { AdbCrypto.loadOrGenerate(context) }
+
+    // The certificate and every ADB authentication operation must use this same keypair.
     private val keyAndCert by lazy { loadOrGenerateKeyAndCert() }
+
+    init {
+        setApi(Build.VERSION.SDK_INT)
+        setTimeout(8, TimeUnit.SECONDS)
+        setThrowOnUnauthorised(true)
+    }
+
+    override fun getPrivateKey() = keyAndCert.first
+
+    override fun getCertificate() = keyAndCert.second
+
+    override fun getDeviceName() = DEVICE_NAME
 
     /**
      * Attempts to pair with the on-device ADB daemon using the proper SPAKE2 protocol.
      * The pairing code is the 6-digit PIN displayed in Developer Options → Wireless Debugging.
      */
-    suspend fun pair(host: String = "127.0.0.1", port: Int, pin: String): Result<Boolean> = withContext(Dispatchers.IO) {
+    suspend fun pairDevice(host: String = "127.0.0.1", port: Int, pin: String): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "Pairing via libadb-android PairingConnectionCtx to $host:$port")
 
-            val (privateKey, certificate) = keyAndCert
-            val pairingCtx = PairingConnectionCtx(
-                host,
-                port,
-                pin.toByteArray(Charsets.UTF_8),
-                privateKey,
-                certificate,
-                DEVICE_NAME
-            )
-
-            pairingCtx.use { ctx ->
-                ctx.start()
-            }
+            val paired = super.pair(host, port, pin)
+            check(paired) { "The device rejected the pairing request" }
 
             Log.i(TAG, "Pairing succeeded with $host:$port")
             Result.success(true)
@@ -61,58 +62,53 @@ class AdbPairingClient(private val context: Context) {
         }
     }
 
-    /**
-     * Returns a dadb-compatible AdbKeyPair for the Dadb TCP connection layer.
-     */
-    fun getAdbKeyPair(): AdbKeyPair {
-        val (privateKey, _) = keyAndCert
-        val pubKeyBytes = AdbCrypto.loadOrGenerate(context).getAdbPublicKeyPayload()
-        return AdbKeyPair(
-            privateKey = privateKey,
-            publicKeyBytes = pubKeyBytes
-        )
+    suspend fun connectAdb(host: String, port: Int): Result<Boolean> = withContext(Dispatchers.IO) {
+        runCatching {
+            disconnect()
+            check(super.connect(host, port)) { "ADB rejected the TLS connection" }
+            true
+        }
     }
+
+    suspend fun executeShell(command: String): String = withContext(Dispatchers.IO) {
+        openStream("shell:$command").use { stream ->
+            stream.openInputStream().bufferedReader().use { it.readText() }
+        }
+    }
+
+    /** Opens a bidirectional shell command that must remain alive (for example `hid -`). */
+    fun openShellStream(command: String): AdbStream = openStream("shell:$command")
 
     /**
      * Loads or generates a persistent RSA private key + self-signed X.509 certificate
      * for use with PairingConnectionCtx.
      */
     private fun loadOrGenerateKeyAndCert(): Pair<java.security.PrivateKey, X509Certificate> {
-        val privFile = File(context.filesDir, KEY_FILE_PRIVATE)
         val certFile = File(context.filesDir, CERT_FILE)
+        val keyPair = adbCrypto.keyPair
 
-        if (privFile.exists() && certFile.exists()) {
+        if (certFile.exists()) {
             try {
-                val kf = KeyFactory.getInstance("RSA")
-                val privBytes = FileInputStream(privFile).use { it.readBytes() }
-                val privateKey = kf.generatePrivate(PKCS8EncodedKeySpec(privBytes))
-
                 val cf = CertificateFactory.getInstance("X.509")
                 val cert = FileInputStream(certFile).use { cf.generateCertificate(it) as X509Certificate }
+                require(cert.publicKey.encoded.contentEquals(keyPair.public.encoded)) {
+                    "Stored ADB certificate belongs to a different key"
+                }
 
                 Log.d(TAG, "Loaded existing RSA key and certificate")
-                return Pair(privateKey, cert)
+                return Pair(keyPair.private, cert)
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to load existing keys, regenerating", e)
-                privFile.delete()
+                Log.w(TAG, "Failed to load matching certificate, regenerating", e)
                 certFile.delete()
             }
         }
 
-        // Generate new 2048-bit RSA keypair
-        val kpg = KeyPairGenerator.getInstance("RSA")
-        kpg.initialize(2048)
-        val kp = kpg.generateKeyPair()
+        val cert = generateSelfSignedCert(keyPair)
 
-        // Generate self-signed X.509 certificate using Android's built-in APIs
-        val cert = generateSelfSignedCert(kp)
-
-        // Persist
-        FileOutputStream(privFile).use { it.write(kp.private.encoded) }
         FileOutputStream(certFile).use { it.write(cert.encoded) }
 
-        Log.i(TAG, "Generated new RSA key and self-signed certificate")
-        return Pair(kp.private, cert)
+        Log.i(TAG, "Generated a certificate for the persistent ADB key")
+        return Pair(keyPair.private, cert)
     }
 
     /**

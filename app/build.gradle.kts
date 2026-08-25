@@ -8,6 +8,7 @@ plugins {
 android {
     namespace = "com.minidex.app"
     compileSdk = 35
+    ndkVersion = "27.0.12077973"
 
     defaultConfig {
         applicationId = "com.minidex.app"
@@ -60,6 +61,39 @@ android {
     }
 }
 
+// Build the tiny arm64 shell-side UHID bridge as an APK asset. It runs under
+// the already-authorized ADB shell UID, which is allowed to open /dev/uhid.
+val generatedUhidAssets = layout.buildDirectory.dir("generated/uhidAssets")
+val buildUhidHelper = tasks.register<Exec>("buildUhidHelper") {
+    val source = layout.projectDirectory.file("src/main/cpp/minidex_uhid.c")
+    val output = generatedUhidAssets.map { it.file("minidex_uhid_arm64") }
+    inputs.file(source)
+    outputs.file(output)
+
+    doFirst {
+        val ndk = androidComponents.sdkComponents.sdkDirectory.get().asFile
+            .resolve("ndk/27.0.12077973")
+        val hostTag = when {
+            System.getProperty("os.name").startsWith("Mac", ignoreCase = true) -> "darwin-x86_64"
+            System.getProperty("os.name").startsWith("Linux", ignoreCase = true) -> "linux-x86_64"
+            else -> error("Unsupported NDK build host: ${System.getProperty("os.name")}")
+        }
+        val clang = ndk.resolve("toolchains/llvm/prebuilt/$hostTag/bin/aarch64-linux-android29-clang")
+        output.get().asFile.parentFile.mkdirs()
+        commandLine(
+            clang.absolutePath,
+            "-Oz", "-fPIE", "-pie", "-s",
+            source.asFile.absolutePath,
+            "-o", output.get().asFile.absolutePath
+        )
+    }
+}
+
+android.sourceSets.getByName("main").assets.srcDir(generatedUhidAssets)
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }.configureEach {
+    dependsOn(buildUhidHelper)
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -84,8 +118,11 @@ dependencies {
     // Wireless ADB & Shizuku
     implementation(libs.shizuku.api)
     implementation(libs.shizuku.provider)
-    implementation(libs.dadb)
     implementation("com.github.MuntashirAkon:libadb-android:3.1.1")
+    // PairingConnectionCtx needs the public Conscrypt key-export API. Android's
+    // platform Conscrypt exposes a different hidden signature on some releases,
+    // which otherwise surfaces as NoSuchMethodException during pairing.
+    implementation("org.conscrypt:conscrypt-android:2.5.3")
     implementation("org.bouncycastle:bcpkix-jdk15to18:1.81")
 
     // Testing

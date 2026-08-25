@@ -11,6 +11,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.minidex.app.domain.model.AccentColor
+import com.minidex.app.domain.model.CursorMode
 import com.minidex.app.domain.model.HapticStrength
 import com.minidex.app.domain.model.KeyHeightLevel
 import com.minidex.app.domain.model.ThemeVariant
@@ -35,6 +36,7 @@ class UserPreferencesRepository(private val context: Context) {
         val SCROLL_SENSITIVITY = floatPreferencesKey("scroll_sensitivity")
         val NATURAL_SCROLLING = booleanPreferencesKey("natural_scrolling")
         val TAP_TO_CLICK = booleanPreferencesKey("tap_to_click")
+        val CURSOR_MODE = stringPreferencesKey("cursor_mode")
         val PREFERRED_BACKEND = stringPreferencesKey("preferred_backend")
         val MANUAL_DISPLAY_ID = intPreferencesKey("manual_display_id")
         val ADB_AUTO_CONNECT = booleanPreferencesKey("adb_auto_connect")
@@ -72,6 +74,11 @@ class UserPreferencesRepository(private val context: Context) {
             scrollSensitivity = prefs[Keys.SCROLL_SENSITIVITY] ?: 1.0f,
             naturalScrolling = prefs[Keys.NATURAL_SCROLLING] ?: false,
             tapToClick = prefs[Keys.TAP_TO_CLICK] ?: true,
+            cursorMode = try {
+                CursorMode.valueOf(prefs[Keys.CURSOR_MODE] ?: CursorMode.AUTO_NATIVE.name)
+            } catch (_: Exception) {
+                CursorMode.AUTO_NATIVE
+            },
             preferredBackend = prefs[Keys.PREFERRED_BACKEND] ?: "AUTO",
             manualDisplayId = prefs[Keys.MANUAL_DISPLAY_ID] ?: -1,
             adbAutoConnect = prefs[Keys.ADB_AUTO_CONNECT] ?: true,
@@ -111,6 +118,11 @@ class UserPreferencesRepository(private val context: Context) {
                 scrollSensitivity = prefs[Keys.SCROLL_SENSITIVITY] ?: 1.0f,
                 naturalScrolling = prefs[Keys.NATURAL_SCROLLING] ?: false,
                 tapToClick = prefs[Keys.TAP_TO_CLICK] ?: true,
+                cursorMode = try {
+                    CursorMode.valueOf(prefs[Keys.CURSOR_MODE] ?: CursorMode.AUTO_NATIVE.name)
+                } catch (_: Exception) {
+                    CursorMode.AUTO_NATIVE
+                },
                 preferredBackend = prefs[Keys.PREFERRED_BACKEND] ?: "AUTO",
                 manualDisplayId = prefs[Keys.MANUAL_DISPLAY_ID] ?: -1,
                 adbAutoConnect = prefs[Keys.ADB_AUTO_CONNECT] ?: true,
@@ -131,6 +143,7 @@ class UserPreferencesRepository(private val context: Context) {
             prefs[Keys.SCROLL_SENSITIVITY] = updated.scrollSensitivity
             prefs[Keys.NATURAL_SCROLLING] = updated.naturalScrolling
             prefs[Keys.TAP_TO_CLICK] = updated.tapToClick
+            prefs[Keys.CURSOR_MODE] = updated.cursorMode.name
             prefs[Keys.PREFERRED_BACKEND] = updated.preferredBackend
             prefs[Keys.MANUAL_DISPLAY_ID] = updated.manualDisplayId
             prefs[Keys.ADB_AUTO_CONNECT] = updated.adbAutoConnect

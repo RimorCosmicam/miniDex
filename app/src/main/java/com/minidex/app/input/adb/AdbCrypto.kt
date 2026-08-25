@@ -1,16 +1,12 @@
 package com.minidex.app.input.adb
 
 import android.content.Context
-import android.util.Base64
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.security.KeyFactory
 import java.security.KeyPair
 import java.security.KeyPairGenerator
-import java.security.PrivateKey
-import java.security.PublicKey
-import java.security.Signature
 import java.security.interfaces.RSAPrivateCrtKey
 import java.security.interfaces.RSAPublicKey
 import java.security.spec.PKCS8EncodedKeySpec
@@ -38,6 +34,10 @@ class AdbCrypto private constructor(val keyPair: KeyPair) {
 
                     val pubBytes = FileInputStream(pubFile).use { it.readBytes() }
                     val publicKey = kf.generatePublic(X509EncodedKeySpec(pubBytes))
+                    require(
+                        (privateKey as? RSAPrivateCrtKey)?.modulus ==
+                            (publicKey as? RSAPublicKey)?.modulus
+                    ) { "Stored ADB private and public keys do not match" }
 
                     return AdbCrypto(KeyPair(publicKey, privateKey))
                 } catch (_: Exception) {
@@ -58,17 +58,4 @@ class AdbCrypto private constructor(val keyPair: KeyPair) {
         }
     }
 
-    fun signToken(token: ByteArray): ByteArray {
-        val signer = Signature.getInstance("SHA1withRSA")
-        signer.initSign(keyPair.private)
-        signer.update(token)
-        return signer.sign()
-    }
-
-    fun getAdbPublicKeyPayload(): ByteArray {
-        val pub = keyPair.public as RSAPublicKey
-        val encodedPub = Base64.encodeToString(pub.encoded, Base64.NO_WRAP)
-        val user = "minidex@zflip7\u0000"
-        return "$encodedPub $user".toByteArray(Charsets.UTF_8)
-    }
 }

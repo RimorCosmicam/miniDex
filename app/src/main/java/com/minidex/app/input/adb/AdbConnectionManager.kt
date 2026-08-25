@@ -5,17 +5,22 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.provider.Settings
 import android.util.Log
-import dadb.AdbKeyPair
-import dadb.Dadb
+import com.minidex.app.domain.model.CursorMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
 import rikka.shizuku.Shizuku
+import io.github.muntashirakon.adb.AdbStream
+import java.io.InputStream
 import java.io.OutputStream
 import java.lang.reflect.Method
 import java.util.concurrent.atomic.AtomicBoolean
@@ -38,7 +43,22 @@ class AdbConnectionManager(
 ) {
     companion object {
         private const val TAG = "AdbConnectionManager"
+        private const val MDNS_CONNECT_TIMEOUT_MS = 12_000L
+        private const val HID_REGISTER_DELAY_MS = 80
+        private const val HID_CLICK_DELAY_MS = 8
+        private const val HID_DEVICE_ID = 1
         const val DEFAULT_PORT = 5555
+
+        // Standard relative USB mouse: 3 buttons, X/Y, vertical wheel, horizontal pan.
+        private val HID_MOUSE_DESCRIPTOR = intArrayOf(
+            0x05, 0x01, 0x09, 0x02, 0xA1, 0x01, 0x09, 0x01, 0xA1, 0x00,
+            0x05, 0x09, 0x19, 0x01, 0x29, 0x03, 0x15, 0x00, 0x25, 0x01,
+            0x95, 0x03, 0x75, 0x01, 0x81, 0x02, 0x95, 0x01, 0x75, 0x05,
+            0x81, 0x01, 0x05, 0x01, 0x09, 0x30, 0x09, 0x31, 0x09, 0x38,
+            0x15, 0x81, 0x25, 0x7F, 0x75, 0x08, 0x95, 0x03, 0x81, 0x06,
+            0x05, 0x0C, 0x0A, 0x38, 0x02, 0x15, 0x81, 0x25, 0x7F,
+            0x75, 0x08, 0x95, 0x01, 0x81, 0x06, 0xC0, 0xC0
+        )
     }
 
     val mdnsDiscovery = AdbMdnsDiscovery(context)
@@ -53,9 +73,16 @@ class AdbConnectionManager(
     private val _isShizukuAvailable = MutableStateFlow(false)
     val isShizukuAvailable: StateFlow<Boolean> = _isShizukuAvailable.asStateFlow()
 
-    private var dadbInstance: Dadb? = null
     private var shizukuProcess: Process? = null
     private var shizukuOutputStream: OutputStream? = null
+
+    private val hidLock = Any()
+    private var hidProcess: Process? = null
+    private var hidAdbStream: AdbStream? = null
+    private var hidOutputStream: OutputStream? = null
+    private var hidButtonMask = 0
+    private var nativeHidProtocol = false
+    @Volatile private var requestedCursorMode = CursorMode.AUTO_NATIVE
 
     private val isConnecting = AtomicBoolean(false)
 
@@ -64,6 +91,11 @@ class AdbConnectionManager(
         try {
             Shizuku.addBinderReceivedListenerSticky {
                 checkShizukuStatus()
+            }
+            Shizuku.addRequestPermissionResultListener { _, grantResult ->
+                if (grantResult == PackageManager.PERMISSION_GRANTED) {
+                    scope.launch { connect() }
+                }
             }
         } catch (_: Throwable) {}
     }
@@ -85,7 +117,11 @@ class AdbConnectionManager(
     fun requestShizukuPermission(requestCode: Int = 1001) {
         try {
             if (Shizuku.pingBinder()) {
-                Shizuku.requestPermission(requestCode)
+                if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
+                    scope.launch { connect() }
+                } else {
+                    Shizuku.requestPermission(requestCode)
+                }
             }
         } catch (e: Throwable) {
             Log.e(TAG, "Failed to request Shizuku permission", e)
@@ -110,9 +146,12 @@ class AdbConnectionManager(
 
     fun openWirelessDebuggingSettings() {
         val intents = listOf(
-            Intent("android.settings.WIFI_IP_SETTINGS"),
+            Intent().setClassName(
+                "com.android.settings",
+                "com.android.settings.Settings\$WirelessDebuggingActivity"
+            ),
+            Intent("android.settings.WIRELESS_DEBUGGING_SETTINGS"),
             Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS),
-            Intent(Settings.ACTION_DEVICE_INFO_SETTINGS),
             Intent(Settings.ACTION_SETTINGS)
         )
 
@@ -139,20 +178,37 @@ class AdbConnectionManager(
         }
     }
 
-    suspend fun pairWithCode(port: Int, code: String, host: String = "127.0.0.1"): Result<Boolean> = withContext(Dispatchers.IO) {
+    suspend fun pairWithCode(
+        port: Int,
+        code: String,
+        host: String = mdnsDiscovery.discoveredHost.value
+    ): Result<Boolean> = withContext(Dispatchers.IO) {
         _status.value = AdbConnectionStatus.PAIRING
         _statusMessage.value = "Pairing with code $code on port $port..."
 
-        val result = pairingClient.pair(host, port, code)
+        val result = pairingClient.pairDevice(host, port, code)
         if (result.isSuccess) {
             _statusMessage.value = "Paired successfully! Connecting..."
             Log.i(TAG, "Pairing succeeded! Attempting auto-connect...")
 
-            // Wait briefly for daemon to register pairing and attempt connection
-            kotlinx.coroutines.delay(1000)
-            val connectPort = mdnsDiscovery.discoveredConnectPort.value ?: port
-            connect(host, connectPort)
-            Result.success(true)
+            // Pairing and connection use different randomized ports. Never reuse
+            // the pairing port: wait for the connect service advertised by adbd.
+            val connectPort = mdnsDiscovery.discoveredConnectPort.value
+                ?: withTimeoutOrNull(MDNS_CONNECT_TIMEOUT_MS) {
+                    mdnsDiscovery.discoveredConnectPort.filterNotNull().first()
+                }
+
+            if (connectPort == null) {
+                val error = IllegalStateException(
+                    "Paired, but the ADB connection port was not discovered. " +
+                        "Keep Wireless debugging enabled and try Connect again."
+                )
+                _status.value = AdbConnectionStatus.ERROR
+                _statusMessage.value = error.message.orEmpty()
+                Result.failure(error)
+            } else {
+                connect(mdnsDiscovery.discoveredHost.value, connectPort)
+            }
         } else {
             _status.value = AdbConnectionStatus.ERROR
             val err = result.exceptionOrNull()?.message ?: "Unknown pairing error"
@@ -178,35 +234,48 @@ class AdbConnectionManager(
                     if (process != null) {
                         shizukuProcess = process
                         shizukuOutputStream = process.outputStream
+                        val hidReady = startCursorTransport(useShizuku = true)
                         _status.value = AdbConnectionStatus.CONNECTED
-                        _statusMessage.value = "Connected via Shizuku (Zero-Latency)"
+                        _statusMessage.value = if (hidReady) {
+                            "Connected via Shizuku (hardware mouse active)"
+                        } else {
+                            "Connected via Shizuku (mouse compatibility mode)"
+                        }
                         isConnecting.set(false)
                         return@withContext Result.success(true)
                     }
                 } catch (e: Throwable) {
-                    Log.w(TAG, "Shizuku connection failed, falling back to Dadb socket", e)
+                    Log.w(TAG, "Shizuku connection failed, falling back to TLS ADB", e)
                 }
             }
 
-            // Priority 2: Direct Dadb TCP connection
-            val keyPair = pairingClient.getAdbKeyPair()
-            val dadb = Dadb.create(host, port, keyPair)
-            dadbInstance = dadb
+            // Wireless Debugging is TLS ADB. Use the same libadb session and
+            // identity that performed pairing; Dadb only speaks legacy TCP ADB.
+            val connectResult = pairingClient.connectAdb(host, port)
+            connectResult.getOrThrow()
 
-            // Test shell execution
-            val testResp = dadb.shell("echo minidex_adb_ready")
-            Log.i(TAG, "ADB shell test output: ${testResp.output}")
+            val testOutput = pairingClient.executeShell("echo minidex_adb_ready")
+            check(testOutput.contains("minidex_adb_ready")) {
+                "ADB connected but the shell readiness check failed"
+            }
+            Log.i(TAG, "ADB shell test output: $testOutput")
+
+            val hidReady = startCursorTransport(useShizuku = false)
 
             _status.value = AdbConnectionStatus.CONNECTED
-            _statusMessage.value = "Connected to ADB on $host:$port"
-            isConnecting.set(false)
+            _statusMessage.value = if (hidReady) {
+                "Connected to ADB (hardware mouse active)"
+            } else {
+                "Connected to ADB (mouse compatibility mode)"
+            }
             Result.success(true)
         } catch (e: Exception) {
             Log.e(TAG, "ADB connect error on $host:$port", e)
             _status.value = AdbConnectionStatus.ERROR
             _statusMessage.value = "Connect failed: ${e.message ?: "Could not connect"}"
-            isConnecting.set(false)
             Result.failure(e)
+        } finally {
+            isConnecting.set(false)
         }
     }
 
@@ -224,22 +293,241 @@ class AdbConnectionManager(
                 return true
             }
 
-            // Fallback to one-shot dadb shell execution
-            dadbInstance?.let {
-                scope.launch(Dispatchers.IO) {
-                    try {
-                        it.shell(command)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error running shell command: $command", e)
-                    }
+            // Fallback to one-shot TLS ADB shell execution.
+            scope.launch(Dispatchers.IO) {
+                try {
+                    pairingClient.executeShell(command)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error running shell command: $command", e)
                 }
-                return true
             }
+            return true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to send command to ADB stream: $command", e)
             disconnect()
         }
         return false
+    }
+
+    /** Sends relative motion through a real virtual HID mouse so Android renders its cursor. */
+    fun sendHidPointerMove(dx: Int, dy: Int): Boolean = synchronized(hidLock) {
+        if (hidOutputStream == null) return@synchronized false
+        if (dx == 0 && dy == 0) return@synchronized true
+        var remainingX = dx
+        var remainingY = dy
+        while (remainingX != 0 || remainingY != 0) {
+            val stepX = remainingX.coerceIn(-127, 127)
+            val stepY = remainingY.coerceIn(-127, 127)
+            if (!writeHidReportLocked(hidButtonMask, stepX, stepY, 0, 0)) {
+                closeHidMouseLocked()
+                return@synchronized false
+            }
+            remainingX -= stepX
+            remainingY -= stepY
+        }
+        true
+    }
+
+    fun setCursorMode(mode: CursorMode) {
+        if (requestedCursorMode == mode) return
+        requestedCursorMode = mode
+        if (_status.value == AdbConnectionStatus.CONNECTED) {
+            scope.launch(Dispatchers.IO) {
+                startCursorTransport(useShizuku = shizukuProcess != null)
+            }
+        }
+    }
+
+    fun sendHidPointerButton(button: Int, isDown: Boolean): Boolean = synchronized(hidLock) {
+        if (hidOutputStream == null) return@synchronized false
+        val bit = when (button) {
+            2 -> 0x02
+            3 -> 0x04
+            else -> 0x01
+        }
+        hidButtonMask = if (isDown) hidButtonMask or bit else hidButtonMask and bit.inv()
+        if (writeHidReportLocked(hidButtonMask, 0, 0, 0, 0)) true else {
+            closeHidMouseLocked()
+            false
+        }
+    }
+
+    fun sendHidPointerClick(button: Int): Boolean = synchronized(hidLock) {
+        if (hidOutputStream == null) return@synchronized false
+        val bit = when (button) {
+            2 -> 0x02
+            3 -> 0x04
+            else -> 0x01
+        }
+        val originalMask = hidButtonMask
+        val down = writeHidReportLocked(originalMask or bit, 0, 0, 0, 0)
+        val delayed = down && if (nativeHidProtocol) {
+            writeHidLineLocked("D $HID_CLICK_DELAY_MS")
+        } else {
+            writeHidJsonLocked(
+                "{\"id\":$HID_DEVICE_ID,\"command\":\"delay\",\"duration\":$HID_CLICK_DELAY_MS}"
+            )
+        }
+        val up = delayed && writeHidReportLocked(originalMask, 0, 0, 0, 0)
+        if (!up) closeHidMouseLocked()
+        up
+    }
+
+    fun sendHidScroll(horizontal: Int, vertical: Int): Boolean = synchronized(hidLock) {
+        if (hidOutputStream == null) return@synchronized false
+        var remainingH = horizontal
+        var remainingV = vertical
+        while (remainingH != 0 || remainingV != 0) {
+            val stepH = remainingH.coerceIn(-127, 127)
+            val stepV = remainingV.coerceIn(-127, 127)
+            if (!writeHidReportLocked(hidButtonMask, 0, 0, stepV, stepH)) {
+                closeHidMouseLocked()
+                return@synchronized false
+            }
+            remainingH -= stepH
+            remainingV -= stepV
+        }
+        true
+    }
+
+    private suspend fun startCursorTransport(useShizuku: Boolean): Boolean {
+        return if (requestedCursorMode == CursorMode.ANDROID_HID) {
+            startPlatformHidMouse(useShizuku)
+        } else {
+            startNativeHidMouse(useShizuku) || startPlatformHidMouse(useShizuku)
+        }
+    }
+
+    private suspend fun startNativeHidMouse(useShizuku: Boolean): Boolean = withContext(Dispatchers.IO) {
+        synchronized(hidLock) {
+            closeHidMouseLocked()
+            try {
+                val remotePath = "/data/local/tmp/minidex_uhid"
+                val installed = context.assets.open("minidex_uhid_arm64").use { asset ->
+                    if (useShizuku) {
+                        val installer = spawnShizukuProcess(arrayOf("sh", "-c", "cat > $remotePath"))
+                            ?: return@synchronized false
+                        installer.outputStream.use { asset.copyTo(it) }
+                        installer.waitFor() == 0
+                    } else {
+                        pairingClient.openShellStream("cat > $remotePath").use { stream ->
+                            stream.openOutputStream().use { asset.copyTo(it) }
+                        }
+                        true
+                    }
+                }
+                if (!installed) return@synchronized false
+
+                if (useShizuku) {
+                    val chmod = spawnShizukuProcess(arrayOf("sh", "-c", "chmod 700 $remotePath"))
+                        ?: return@synchronized false
+                    chmod.waitFor()
+                    val process = spawnShizukuProcess(arrayOf("sh", "-c", remotePath))
+                        ?: return@synchronized false
+                    hidProcess = process
+                    hidOutputStream = process.outputStream
+                    scope.launch(Dispatchers.IO) { runCatching { drainHidOutput(process.inputStream) } }
+                } else {
+                    val stream = pairingClient.openShellStream("chmod 700 $remotePath && exec $remotePath")
+                    hidAdbStream = stream
+                    hidOutputStream = stream.openOutputStream()
+                    scope.launch(Dispatchers.IO) { runCatching { drainHidOutput(stream.openInputStream()) } }
+                }
+                nativeHidProtocol = true
+                true
+            } catch (e: Exception) {
+                Log.w(TAG, "Native UHID mouse unavailable", e)
+                closeHidMouseLocked()
+                false
+            }
+        }
+    }.also { ready ->
+        if (ready) delay(140)
+    }
+
+    private suspend fun startPlatformHidMouse(useShizuku: Boolean): Boolean = withContext(Dispatchers.IO) {
+        synchronized(hidLock) {
+            closeHidMouseLocked()
+            try {
+                if (useShizuku) {
+                    val process = spawnShizukuProcess(arrayOf("sh", "-c", "hid -"))
+                        ?: return@synchronized false
+                    hidProcess = process
+                    hidOutputStream = process.outputStream
+                    scope.launch(Dispatchers.IO) {
+                        runCatching { drainHidOutput(process.inputStream) }
+                    }
+                } else {
+                    val stream = pairingClient.openShellStream("hid -")
+                    hidAdbStream = stream
+                    hidOutputStream = stream.openOutputStream()
+                    scope.launch(Dispatchers.IO) {
+                        runCatching { drainHidOutput(stream.openInputStream()) }
+                    }
+                }
+
+                val descriptor = HID_MOUSE_DESCRIPTOR.joinToString(",")
+                val registered = writeHidJsonLocked(
+                    "{\"id\":$HID_DEVICE_ID,\"command\":\"register\",\"name\":\"MiniDex Virtual Mouse\",\"vid\":6353,\"pid\":20002,\"bus\":\"usb\",\"descriptor\":[$descriptor]}"
+                ) && writeHidJsonLocked(
+                    "{\"id\":$HID_DEVICE_ID,\"command\":\"delay\",\"duration\":$HID_REGISTER_DELAY_MS}"
+                )
+                if (!registered) closeHidMouseLocked()
+                nativeHidProtocol = false
+                registered
+            } catch (e: Exception) {
+                Log.w(TAG, "Virtual HID mouse is unavailable; using shell input fallback", e)
+                closeHidMouseLocked()
+                false
+            }
+        }
+    }.also { ready ->
+        if (ready) delay(HID_REGISTER_DELAY_MS.toLong())
+    }
+
+    private fun writeHidReportLocked(buttons: Int, dx: Int, dy: Int, wheel: Int, horizontalWheel: Int): Boolean {
+        if (nativeHidProtocol) {
+            return writeHidLineLocked("R $buttons $dx $dy $wheel $horizontalWheel")
+        }
+        return writeHidJsonLocked(
+            "{\"id\":$HID_DEVICE_ID,\"command\":\"report\",\"report\":[${buttons and 0xFF},${dx and 0xFF},${dy and 0xFF},${wheel and 0xFF},${horizontalWheel and 0xFF}]}"
+        )
+    }
+
+    private fun writeHidJsonLocked(json: String): Boolean {
+        return writeHidLineLocked(json)
+    }
+
+    private fun writeHidLineLocked(line: String): Boolean {
+        val output = hidOutputStream ?: return false
+        return runCatching {
+            output.write("$line\n".toByteArray(Charsets.UTF_8))
+            output.flush()
+            true
+        }.getOrElse {
+            Log.w(TAG, "Virtual HID mouse write failed", it)
+            false
+        }
+    }
+
+    private fun drainHidOutput(input: InputStream) {
+        input.use {
+            val buffer = ByteArray(1024)
+            while (it.read(buffer) != -1) {
+                // Keep the persistent shell's output window clear.
+            }
+        }
+    }
+
+    private fun closeHidMouseLocked() {
+        runCatching { hidOutputStream?.close() }
+        runCatching { hidAdbStream?.close() }
+        runCatching { hidProcess?.destroy() }
+        hidOutputStream = null
+        hidAdbStream = null
+        hidProcess = null
+        hidButtonMask = 0
+        nativeHidProtocol = false
     }
 
     suspend fun executeShellSync(command: String): String = withContext(Dispatchers.IO) {
@@ -248,7 +536,7 @@ class AdbConnectionManager(
                 val proc = spawnShizukuProcess(arrayOf("sh", "-c", command))
                 proc?.inputStream?.bufferedReader()?.readText() ?: ""
             } else {
-                dadbInstance?.shell(command)?.output ?: ""
+                pairingClient.executeShell(command)
             }
         } catch (e: Exception) {
             Log.e(TAG, "executeShellSync failed for: $command", e)
@@ -257,10 +545,10 @@ class AdbConnectionManager(
     }
 
     fun disconnect() {
+        synchronized(hidLock) { closeHidMouseLocked() }
         try {
-            dadbInstance?.close()
+            pairingClient.disconnect()
         } catch (_: Exception) {}
-        dadbInstance = null
 
         try {
             shizukuOutputStream?.close()
