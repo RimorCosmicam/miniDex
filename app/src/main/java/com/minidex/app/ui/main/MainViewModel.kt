@@ -104,6 +104,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+
+        viewModelScope.launch {
+            var previousDexDisplayId = -1
+            availableDisplays.collect { displays ->
+                val currentHighestExternal = displays
+                    .asSequence()
+                    .filter { it.isExternal && it.isConnected }
+                    .maxOfOrNull { it.displayId } ?: -1
+                val previousDexWasRemoved = previousDexDisplayId >= 2 &&
+                    displays.none { it.displayId == previousDexDisplayId && it.isConnected }
+                if (previousDexWasRemoved) {
+                    backendManager.adbManager.resetSamsungKeyboardAfterDex()
+                }
+                previousDexDisplayId = currentHighestExternal
+            }
+        }
     }
 
     fun toggleAppMode() {

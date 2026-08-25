@@ -449,6 +449,14 @@ class AdbConnectionManager(
         }
     }
 
+    fun resetSamsungKeyboardAfterDex() {
+        if (_status.value != AdbConnectionStatus.CONNECTED) return
+        // Honeyboard incorrectly retains DeX's transient floating layout on some
+        // Fold builds. Restarting only the IME process clears that runtime layout
+        // without erasing learned words, languages, or keyboard preferences.
+        sendCommand("am force-stop com.samsung.android.honeyboard")
+    }
+
     fun setCursorMode(mode: CursorMode) {
         if (requestedCursorMode == mode) return
         requestedCursorMode = mode
