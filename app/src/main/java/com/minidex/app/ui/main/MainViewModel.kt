@@ -56,12 +56,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _showMacroEditor = MutableStateFlow(false)
     val showMacroEditor: StateFlow<Boolean> = _showMacroEditor.asStateFlow()
 
-    init {
-        backendManager.accessibilityBackend.onPointerUpdate = { x, y ->
-            displayManager.updatePointerPosition(x, y)
-        }
-    }
-
     private val targetDisplayId: Int
         get() {
             val prefManual = userPreferences.value.manualDisplayId
@@ -190,10 +184,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setMacroEditorVisible(visible: Boolean) {
         _showMacroEditor.value = visible
-    }
-
-    fun attachActivity(activity: android.app.Activity) {
-        displayManager.attachActivity(activity)
     }
 
     fun openAccessibilitySettings() {

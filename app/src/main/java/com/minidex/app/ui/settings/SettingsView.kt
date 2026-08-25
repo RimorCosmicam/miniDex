@@ -45,6 +45,7 @@ fun SettingsView(
     preferences: UserPreferences,
     dexDisplayInfo: DexDisplayInfo,
     isAccessibilityEnabled: Boolean,
+    isImeEnabled: Boolean,
     activeBackendName: String,
     onOpenAccessibilitySettings: () -> Unit,
     onOpenImeSettings: () -> Unit,
@@ -53,7 +54,6 @@ fun SettingsView(
 ) {
     val colors = LocalMiniDexColors.current
     val scrollState = rememberScrollState()
-    val isImeActive = MiniDexInputMethodService.isImeActive()
 
     Column(
         modifier = modifier
@@ -127,8 +127,8 @@ fun SettingsView(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(6.dp))
-                        .background(if (isImeActive) colors.accent.copy(alpha = 0.2f) else colors.surfaceElevated)
-                        .border(1.dp, if (isImeActive) colors.accent else colors.border.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                        .background(if (isImeEnabled) colors.accent.copy(alpha = 0.2f) else colors.surfaceElevated)
+                        .border(1.dp, if (isImeEnabled) colors.accent else colors.border.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
                         .clickable { onOpenImeSettings() }
                         .padding(horizontal = 8.dp, vertical = 6.dp)
                 ) {
@@ -145,14 +145,14 @@ fun SettingsView(
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = if (isImeActive) "✓ Direct DeX Typing Active" else "Tap to Enable in Keyboard Settings",
-                                color = if (isImeActive) colors.accent else colors.textSecondary,
+                                text = if (isImeEnabled) "✓ DeX Keyboard Enabled in System" else "Tap to Enable in Keyboard Settings",
+                                color = if (isImeEnabled) colors.accent else colors.textSecondary,
                                 fontSize = 7.5.sp
                             )
                         }
                         Text(
-                            text = if (isImeActive) "ACTIVE" else "ENABLE →",
-                            color = if (isImeActive) colors.accent else colors.textSecondary,
+                            text = if (isImeEnabled) "ACTIVE" else "ENABLE →",
+                            color = if (isImeEnabled) colors.accent else colors.textSecondary,
                             fontSize = 8.sp,
                             fontWeight = FontWeight.Bold
                         )

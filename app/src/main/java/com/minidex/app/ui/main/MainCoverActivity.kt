@@ -38,9 +38,6 @@ class MainCoverActivity : ComponentActivity() {
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         insetsController.hide(WindowInsetsCompat.Type.navigationBars())
 
-        // Attach Activity to DeX Display Manager for Presentation window rendering
-        viewModel.attachActivity(this)
-
         setContent {
             MainScreen(viewModel = viewModel)
         }

@@ -48,6 +48,7 @@ fun MainScreen(viewModel: MainViewModel) {
     val activeDexDisplay by viewModel.activeDexDisplay.collectAsState()
     val activeBackend by viewModel.activeBackend.collectAsState()
     val isAccessibilityEnabled by viewModel.isAccessibilityEnabled.collectAsState()
+    val isImeEnabled by viewModel.isImeEnabled.collectAsState()
     val showMacroEditor by viewModel.showMacroEditor.collectAsState()
 
     MiniDexTheme(
@@ -170,6 +171,7 @@ fun MainScreen(viewModel: MainViewModel) {
                                                 preferences = preferences,
                                                 dexDisplayInfo = activeDexDisplay,
                                                 isAccessibilityEnabled = isAccessibilityEnabled,
+                                                isImeEnabled = isImeEnabled,
                                                 activeBackendName = activeBackend.name,
                                                 onOpenAccessibilitySettings = { viewModel.openAccessibilitySettings() },
                                                 onOpenImeSettings = { viewModel.openImeSettings() },
