@@ -160,7 +160,7 @@ class PrivilegedMouseService private constructor() : IMouseControl.Stub() {
     }
 
     private fun getRunningTasks(): List<ActivityManager.RunningTaskInfo> {
-        return runCatching {
+        try {
             val service = activityTaskManagerService()
             val methods = Class.forName("android.app.IActivityTaskManager")
                 .methods
@@ -184,11 +184,10 @@ class PrivilegedMouseService private constructor() : IMouseControl.Stub() {
                     return result.filterIsInstance<ActivityManager.RunningTaskInfo>()
                 }
             }
-            emptyList()
-        }.getOrElse {
-            Log.e(TAG, "Could not read running tasks", it)
-            emptyList()
+        } catch (error: Throwable) {
+            Log.e(TAG, "Could not read running tasks", error)
         }
+        return emptyList()
     }
 
     private fun moveTaskToDisplay(taskId: Int, displayId: Int, attempt: Int): Boolean {
