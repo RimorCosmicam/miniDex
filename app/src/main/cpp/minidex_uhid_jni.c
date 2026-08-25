@@ -39,7 +39,7 @@ Java_com_minidex_app_input_adb_PrivilegedMouseService_nativeCreateMouse(
     memset(&event, 0, sizeof(event));
     event.type = UHID_CREATE;
     strncpy((char *)event.u.create.name, "MiniDex DeX Mouse", sizeof(event.u.create.name) - 1);
-    event.u.create.rd_data = (__u64)(uintptr_t)mouse_report_desc;
+    event.u.create.rd_data = (__u8 *)mouse_report_desc;
     event.u.create.rd_size = sizeof(mouse_report_desc);
     event.u.create.bus = BUS_USB;
     event.u.create.vendor = 0x1234;
