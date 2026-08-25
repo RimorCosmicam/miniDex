@@ -413,6 +413,17 @@ class AdbConnectionManager(
         }
     }
 
+    fun sendDisplayTap(displayId: Int, x: Float, y: Float): Boolean = synchronized(hidLock) {
+        val service = mouseService ?: return@synchronized false
+        runCatching {
+            check(service.isReady)
+            service.tap(displayId, x, y)
+        }.getOrElse {
+            Log.e(TAG, "Privileged display-targeted tap failed", it)
+            false
+        }
+    }
+
     fun keepFlexViewExclusiveFor(displayId: Int) {
         if (displayId < 0) return
         exclusiveDisplayId = displayId

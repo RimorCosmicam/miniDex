@@ -9,6 +9,8 @@ import android.os.Looper
 import android.os.Handler
 import android.os.Process
 import android.util.Log
+import android.view.InputDevice
+import android.view.MotionEvent
 
 /** Entry point launched by app_process as the ADB shell user. */
 class PrivilegedMouseService private constructor() : IMouseControl.Stub() {
@@ -76,6 +78,52 @@ class PrivilegedMouseService private constructor() : IMouseControl.Stub() {
                 return
             }
             remaining -= step
+        }
+    }
+
+    override fun tap(displayId: Int, x: Float, y: Float): Boolean {
+        if (!ready || displayId < 0) return false
+        return runCatching {
+            val inputManagerClass = Class.forName("android.hardware.input.InputManager")
+            val inputManager = inputManagerClass.getDeclaredMethod("getInstance")
+                .apply { isAccessible = true }
+                .invoke(null)
+            val injectMethod = inputManagerClass.methods.firstOrNull { method ->
+                method.name == "injectInputEvent" && method.parameterCount == 2
+            } ?: error("InputManager.injectInputEvent unavailable")
+            val setDisplayId = MotionEvent::class.java.getMethod(
+                "setDisplayId",
+                Int::class.javaPrimitiveType
+            )
+            val downTime = android.os.SystemClock.uptimeMillis()
+
+            fun inject(action: Int, eventTime: Long): Boolean {
+                val event = MotionEvent.obtain(
+                    downTime,
+                    eventTime,
+                    action,
+                    x,
+                    y,
+                    0
+                )
+                return try {
+                    event.source = InputDevice.SOURCE_TOUCHSCREEN
+                    setDisplayId.invoke(event, displayId)
+                    injectMethod.invoke(inputManager, event, 2) as? Boolean ?: false
+                } finally {
+                    event.recycle()
+                }
+            }
+
+            val downInjected = inject(MotionEvent.ACTION_DOWN, downTime)
+            Thread.sleep(35L)
+            downInjected && inject(
+                MotionEvent.ACTION_UP,
+                android.os.SystemClock.uptimeMillis()
+            )
+        }.getOrElse {
+            Log.e(TAG, "Could not inject tap on display $displayId", it)
+            false
         }
     }
 
