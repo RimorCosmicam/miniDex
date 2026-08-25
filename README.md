@@ -60,11 +60,18 @@ The **cover screen is the product**. MiniDex is crafted around the physical geom
   - **Two-Finger Tap**: Right Click
   - **Tactile Haptic Feedback**: Crisp physical-feeling click vibrations on tap and drag.
 
-### ⚡ 100% Native, Zero-Disconnect Input Architecture
-No unstable ADB or wireless debug bridges. MiniDex operates purely through standard Android subsystems:
-1. **Native Bluetooth HID Profile**: Acts as a real hardware Bluetooth Keyboard & Mouse directly to the DeX session. Zero latency, 100% hardware scancode fidelity.
-2. **Native Accessibility Service**: Dispatches mouse clicks, drags, swipes, and shortcuts reliably with zero disconnects.
-3. **Virtual Device Framework** (Android 13+).
+### ⚡ Multi-Tier Zero-Latency Input Architecture
+MiniDex utilizes a prioritized high-performance driver architecture:
+1. **On-Device Wireless ADB Driver (Hardware Injection, Zero Latency)**:
+   - Dispatches keystrokes, character strings, mouse clicks, drags, and swipes directly into Android's `input` framework.
+   - **Multi-Display DeX Targeting**: Specifically targets external Samsung DeX display IDs (`input -d <displayId> ...`).
+   - **Frictionless On-Device Pairing**:
+     - **Automatic mDNS Discovery (`NsdManager`)**: Listens for `_adb-tls-pairing._tcp` and `_adb-tls-connect._tcp` in real-time. When you open "Pair device with pairing code" in Android Developer Settings, MiniDex automatically detects the dynamic pairing port.
+     - **6-Digit PIN Entry with Auto-Submit**: Type or paste the 6-digit code and pairing executes instantly.
+     - **Shizuku 1-Tap Bridge**: Instant 1-tap connection if Shizuku is already running on device.
+     - **Auto-Reconnect**: Persists RSA keys and reconnects on app launch.
+2. **Native Accessibility Service**: Multi-display gesture & touch injection fallback.
+3. **Native Keyboard IME (InputMethodService)**: Text injection into DeX desktop windows.
 4. **Simulator / Test Backend**: Standalone local testing mode.
 
 ---
@@ -84,9 +91,12 @@ To launch MiniDex on the Z Flip cover screen:
 5. Fold your device, swipe to the MultiStar widget on FlexWindow, and launch MiniDex!
 
 ### 3. One-Time Input Setup
-MiniDex connects stably through either:
-- **Accessibility Service** (*Instant & Automatic*): Open MiniDex Settings → Tap **Enable Accessibility** → Toggle MiniDex ON.
-- **Bluetooth HID** (*Hardware Emulation*): Open MiniDex Settings → Tap **Pair Bluetooth HID** → Connect.
+MiniDex connects seamlessly through either:
+- **Wireless ADB Driver** (*Recommended for Zero Latency & Hardware Accuracy*):
+  1. Open MiniDex Settings (or tap `ADB` pill in top bar) → Tap **1. Open Wireless Debugging**.
+  2. Tap **Pair device with pairing code** in Android Settings.
+  3. MiniDex auto-detects the port via mDNS — enter the 6-digit code to pair & connect!
+- **Accessibility Service** (*Instant Fallback*): Open MiniDex Settings → Tap **Accessibility Driver** → Toggle MiniDex ON.
 
 ---
 

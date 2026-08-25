@@ -46,9 +46,12 @@ fun SettingsView(
     preferences: UserPreferences,
     dexDisplayInfo: DexDisplayInfo,
     availableDisplays: List<DexDisplayInfo> = emptyList(),
+    isAdbConnected: Boolean = false,
+    adbStatusMessage: String = "Disconnected",
     isAccessibilityEnabled: Boolean,
     isImeEnabled: Boolean,
     activeBackendName: String,
+    onOpenAdbPairing: () -> Unit = {},
     onOpenAccessibilitySettings: () -> Unit,
     onOpenImeSettings: () -> Unit,
     onLaunchSamsungDexTouchpad: () -> Unit = {},
@@ -62,9 +65,53 @@ fun SettingsView(
         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        // Section: Wireless ADB Driver (Highest Performance)
+        item {
+            SettingsGroup(title = "WIRELESS ADB (ZERO LATENCY)") {
+                SettingsClickableRow(
+                    label = "Wireless ADB Driver",
+                    status = if (isAdbConnected) "⚡ Connected" else "Pair Device ›",
+                    statusColor = if (isAdbConnected) Color(0xFF00E676) else colors.accent,
+                    onClick = onOpenAdbPairing
+                )
+
+                SettingsDivider()
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = "Auto-Connect on Launch", color = colors.textPrimary, fontSize = 13.sp)
+                        Text(text = "Connects to localhost on start", color = colors.textSecondary, fontSize = 10.sp)
+                    }
+                    Switch(
+                        checked = preferences.adbAutoConnect,
+                        onCheckedChange = { checked -> onUpdatePreferences { it.copy(adbAutoConnect = checked) } },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = colors.accent,
+                            uncheckedTrackColor = colors.surfaceElevated
+                        )
+                    )
+                }
+
+                SettingsDivider()
+
+                SettingsRow(
+                    label = "Driver Status",
+                    value = if (isAdbConnected) "Active (Hardware Injection)" else adbStatusMessage.take(24),
+                    valueColor = if (isAdbConnected) Color(0xFF00E676) else colors.textSecondary
+                )
+            }
+        }
+
         // Section: System & Integration
         item {
-            SettingsGroup(title = "SYSTEM") {
+            SettingsGroup(title = "SYSTEM & FALLBACKS") {
                 // DeX Status Row
                 SettingsRow(
                     label = "DeX Display",
@@ -132,11 +179,11 @@ fun SettingsView(
                             val isThisSelected = preferences.manualDisplayId == d.displayId
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(if (isThisSelected) colors.accent.copy(alpha = 0.25f) else colors.surfaceElevated)
-                                    .border(1.dp, if (isThisSelected) colors.accent else colors.border.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
-                                    .clickable { onUpdatePreferences { it.copy(manualDisplayId = d.displayId) } }
-                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (isThisSelected) colors.accent.copy(alpha = 0.25f) else colors.surfaceElevated)
+                                .border(1.dp, if (isThisSelected) colors.accent else colors.border.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                                .clickable { onUpdatePreferences { it.copy(manualDisplayId = d.displayId) } }
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
                             ) {
                                 Text(
                                     text = "Display ${d.displayId}${if (d.name.isNotBlank()) " (${d.name.take(8)})" else ""}",
@@ -153,7 +200,7 @@ fun SettingsView(
 
                 // Accessibility Permission Row
                 SettingsClickableRow(
-                    label = "Touchpad & Gestures",
+                    label = "Accessibility Driver",
                     status = if (isAccessibilityEnabled) "Active" else "Enable ›",
                     statusColor = if (isAccessibilityEnabled) colors.accent else Color(0xFFFFB74D),
                     onClick = onOpenAccessibilitySettings
@@ -163,7 +210,7 @@ fun SettingsView(
 
                 // Keyboard IME Setting Row
                 SettingsClickableRow(
-                    label = "DeX Keyboard",
+                    label = "DeX Keyboard IME",
                     status = if (isImeEnabled) "Configured" else "Setup ›",
                     statusColor = if (isImeEnabled) colors.accent else Color(0xFFFFB74D),
                     onClick = onOpenImeSettings

@@ -25,7 +25,9 @@ import com.minidex.app.ui.theme.LocalMiniDexColors
 @Composable
 fun PageBar(
     currentPage: KeyboardPage,
+    isAdbConnected: Boolean = false,
     onPageSelected: (KeyboardPage) -> Unit,
+    onAdbBadgeClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val colors = LocalMiniDexColors.current
@@ -39,6 +41,34 @@ fun PageBar(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Wireless ADB Status Pill
+        val adbShape = RoundedCornerShape(6.dp)
+        Box(
+            modifier = Modifier
+                .height(26.dp)
+                .clip(adbShape)
+                .background(
+                    if (isAdbConnected) Color(0xFF00E676).copy(alpha = 0.2f) else colors.surfaceElevated,
+                    adbShape
+                )
+                .border(
+                    1.dp,
+                    if (isAdbConnected) Color(0xFF00E676).copy(alpha = 0.7f) else colors.border.copy(alpha = 0.4f),
+                    adbShape
+                )
+                .clickable { onAdbBadgeClick() }
+                .padding(horizontal = 6.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = if (isAdbConnected) "⚡ADB" else "ADB",
+                color = if (isAdbConnected) Color(0xFF00E676) else colors.textSecondary,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.2.sp
+            )
+        }
+
         pages.forEach { page ->
             val isSelected = page == currentPage
             val shape = RoundedCornerShape(6.dp)

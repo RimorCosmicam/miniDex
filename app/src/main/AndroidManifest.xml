@@ -2,9 +2,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Permissions for Haptics and Display monitoring -->
+    <!-- Permissions for Haptics, Display monitoring, and Wireless ADB -->
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
 
     <application
         android:name=".MiniDexApplication"
@@ -17,6 +21,15 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.MiniDex"
         tools:targetApi="35">
+
+        <!-- Shizuku Provider for 1-tap wireless ADB privilege binding -->
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:multiprocess="false"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
 
         <!-- Samsung Galaxy Z Flip Cover Screen / FlexWindow compatibility metadata -->
         <meta-data

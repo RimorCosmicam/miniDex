@@ -37,6 +37,8 @@ class UserPreferencesRepository(private val context: Context) {
         val TAP_TO_CLICK = booleanPreferencesKey("tap_to_click")
         val PREFERRED_BACKEND = stringPreferencesKey("preferred_backend")
         val MANUAL_DISPLAY_ID = intPreferencesKey("manual_display_id")
+        val ADB_AUTO_CONNECT = booleanPreferencesKey("adb_auto_connect")
+        val ADB_PORT = intPreferencesKey("adb_port")
     }
 
     val userPreferencesFlow: Flow<UserPreferences> = context.dataStore.data.map { prefs ->
@@ -71,7 +73,9 @@ class UserPreferencesRepository(private val context: Context) {
             naturalScrolling = prefs[Keys.NATURAL_SCROLLING] ?: false,
             tapToClick = prefs[Keys.TAP_TO_CLICK] ?: true,
             preferredBackend = prefs[Keys.PREFERRED_BACKEND] ?: "AUTO",
-            manualDisplayId = prefs[Keys.MANUAL_DISPLAY_ID] ?: -1
+            manualDisplayId = prefs[Keys.MANUAL_DISPLAY_ID] ?: -1,
+            adbAutoConnect = prefs[Keys.ADB_AUTO_CONNECT] ?: true,
+            adbPort = prefs[Keys.ADB_PORT] ?: 5555
         )
     }
 
@@ -108,7 +112,9 @@ class UserPreferencesRepository(private val context: Context) {
                 naturalScrolling = prefs[Keys.NATURAL_SCROLLING] ?: false,
                 tapToClick = prefs[Keys.TAP_TO_CLICK] ?: true,
                 preferredBackend = prefs[Keys.PREFERRED_BACKEND] ?: "AUTO",
-                manualDisplayId = prefs[Keys.MANUAL_DISPLAY_ID] ?: -1
+                manualDisplayId = prefs[Keys.MANUAL_DISPLAY_ID] ?: -1,
+                adbAutoConnect = prefs[Keys.ADB_AUTO_CONNECT] ?: true,
+                adbPort = prefs[Keys.ADB_PORT] ?: 5555
             )
             val updated = transform(current)
 
@@ -127,6 +133,8 @@ class UserPreferencesRepository(private val context: Context) {
             prefs[Keys.TAP_TO_CLICK] = updated.tapToClick
             prefs[Keys.PREFERRED_BACKEND] = updated.preferredBackend
             prefs[Keys.MANUAL_DISPLAY_ID] = updated.manualDisplayId
+            prefs[Keys.ADB_AUTO_CONNECT] = updated.adbAutoConnect
+            prefs[Keys.ADB_PORT] = updated.adbPort
         }
     }
 }

@@ -53,6 +53,9 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "META-INF/LICENSE*.md"
+            excludes += "META-INF/LICENSE*"
+            excludes += "META-INF/NOTICE*"
         }
     }
 }
@@ -77,6 +80,11 @@ dependencies {
 
     // Hidden API bypass for system-level reflection
     implementation(libs.hiddenapibypass)
+
+    // Wireless ADB & Shizuku
+    implementation(libs.shizuku.api)
+    implementation(libs.shizuku.provider)
+    implementation(libs.dadb)
 
     // Testing
     testImplementation(libs.junit)

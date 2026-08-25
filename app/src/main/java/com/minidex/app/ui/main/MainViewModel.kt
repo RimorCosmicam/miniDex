@@ -16,6 +16,7 @@ import com.minidex.app.domain.model.ModifierState
 import com.minidex.app.domain.model.ModifierType
 import com.minidex.app.input.InputBackend
 import com.minidex.app.input.InputBackendManager
+import com.minidex.app.input.adb.AdbConnectionStatus
 import com.minidex.app.ui.components.HapticFeedbackManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,8 +43,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val activeDexDisplay: StateFlow<DexDisplayInfo> = displayManager.activeDexDisplay
     val availableDisplays: StateFlow<List<DexDisplayInfo>> = displayManager.availableDisplays
     val activeBackend: StateFlow<InputBackend> = backendManager.activeBackend
+    val isAdbConnected: StateFlow<Boolean> = backendManager.isAdbConnected
     val isAccessibilityEnabled: StateFlow<Boolean> = backendManager.isAccessibilityEnabled
     val isImeEnabled: StateFlow<Boolean> = backendManager.isImeEnabled
+
+    // ADB States
+    val adbConnectionStatus: StateFlow<AdbConnectionStatus> = backendManager.adbManager.status
+    val adbStatusMessage: StateFlow<String> = backendManager.adbManager.statusMessage
+    val discoveredPairingPort: StateFlow<Int?> = backendManager.adbManager.mdnsDiscovery.discoveredPairingPort
+    val discoveredConnectPort: StateFlow<Int?> = backendManager.adbManager.mdnsDiscovery.discoveredConnectPort
+    val isShizukuAvailable: StateFlow<Boolean> = backendManager.adbManager.isShizukuAvailable
+
+    private val _showAdbPairingDialog = MutableStateFlow(false)
+    val showAdbPairingDialog: StateFlow<Boolean> = _showAdbPairingDialog.asStateFlow()
 
     private val _currentMode = MutableStateFlow(AppMode.KEYBOARD)
     val currentMode: StateFlow<AppMode> = _currentMode.asStateFlow()
@@ -62,6 +74,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val prefManual = userPreferences.value.manualDisplayId
             return if (prefManual != -1) prefManual else activeDexDisplay.value.displayId
         }
+
+    init {
+        // Auto-start mDNS discovery and auto-connect if enabled in preferences
+        viewModelScope.launch {
+            backendManager.adbManager.startMdnsDiscovery()
+
+            if (userPreferences.value.adbAutoConnect) {
+                val defaultPort = userPreferences.value.adbPort
+                backendManager.adbManager.connect("127.0.0.1", defaultPort)
+            }
+        }
+    }
 
     fun toggleAppMode() {
         _currentMode.value = if (_currentMode.value == AppMode.KEYBOARD) AppMode.TOUCHPAD else AppMode.KEYBOARD
@@ -185,6 +209,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setMacroEditorVisible(visible: Boolean) {
         _showMacroEditor.value = visible
+    }
+
+    fun setAdbPairingDialogVisible(visible: Boolean) {
+        _showAdbPairingDialog.value = visible
+        if (visible) {
+            backendManager.adbManager.startMdnsDiscovery()
+        }
+    }
+
+    fun openWirelessDebuggingSettings() {
+        backendManager.openWirelessDebuggingSettings()
+    }
+
+    fun pairAdbWithCode(port: Int, code: String) {
+        viewModelScope.launch {
+            backendManager.adbManager.pairWithCode(port, code)
+        }
+    }
+
+    fun connectAdbDirect(port: Int) {
+        viewModelScope.launch {
+            backendManager.adbManager.connect("127.0.0.1", port)
+        }
+    }
+
+    fun requestShizukuPermission() {
+        backendManager.adbManager.requestShizukuPermission()
+    }
+
+    fun sendAdbTestEvent() {
+        viewModelScope.launch {
+            activeBackend.value.sendPointerClick(1, targetDisplayId)
+            hapticManager.performHaptic(userPreferences.value.hapticStrength)
+        }
     }
 
     fun openAccessibilitySettings() {

@@ -8,6 +8,8 @@ import android.util.Log
 import android.view.accessibility.AccessibilityManager
 import android.view.inputmethod.InputMethodManager
 import com.minidex.app.input.accessibility.MiniDexAccessibilityService
+import com.minidex.app.input.adb.AdbConnectionManager
+import com.minidex.app.input.adb.AdbConnectionStatus
 import com.minidex.app.input.ime.MiniDexInputMethodService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -19,9 +21,11 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * Manages the native same-device drivers for Samsung DeX control:
- * 1. Accessibility Service — multi-display gesture dispatch (touchpad clicks, drags, scrolls)
- * 2. IME InputMethodService — native keyboard text injection into DeX windows
+ * Manages the multi-tier driver architecture for Samsung DeX control:
+ * 1. Wireless ADB Driver — hardware-level input injection (zero-latency, full scancode scancodes & multi-display)
+ * 2. Accessibility Service — native gesture dispatch fallback (touchpad clicks, drags, scrolls)
+ * 3. IME InputMethodService — text input integration
+ * 4. Fallback backend — local simulation/test
  */
 class InputBackendManager(
     private val context: Context,
@@ -31,11 +35,16 @@ class InputBackendManager(
         private const val TAG = "InputBackendManager"
     }
 
+    val adbManager = AdbConnectionManager(context, scope)
+    val adbBackend = AdbInputBackend(adbManager)
     val accessibilityBackend = AccessibilityInputBackend(context)
     val fallbackBackend = FallbackInputBackend()
 
     private val _activeBackend = MutableStateFlow<InputBackend>(accessibilityBackend)
     val activeBackend: StateFlow<InputBackend> = _activeBackend.asStateFlow()
+
+    private val _isAdbConnected = MutableStateFlow(false)
+    val isAdbConnected: StateFlow<Boolean> = _isAdbConnected.asStateFlow()
 
     private val _isAccessibilityEnabled = MutableStateFlow(false)
     val isAccessibilityEnabled: StateFlow<Boolean> = _isAccessibilityEnabled.asStateFlow()
@@ -45,14 +54,26 @@ class InputBackendManager(
 
     init {
         scope.launch {
+            // Collect ADB status changes
+            launch {
+                adbManager.status.collect { status ->
+                    _isAdbConnected.value = (status == AdbConnectionStatus.CONNECTED)
+                    refreshBackend()
+                }
+            }
+
             refreshBackend()
 
-            // Heartbeat: detect when user toggles Accessibility or IME in Settings
+            // Heartbeat: detect when user toggles Accessibility, IME, or Wireless Debugging
             while (isActive) {
                 delay(1500)
                 refreshBackend()
             }
         }
+    }
+
+    fun openWirelessDebuggingSettings() {
+        adbManager.openWirelessDebuggingSettings()
     }
 
     fun openAccessibilitySettings() {
@@ -117,16 +138,18 @@ class InputBackendManager(
     }
 
     suspend fun refreshBackend() {
+        val adbActive = adbBackend.isAvailable
         val a11yActive = checkAccessibilityServiceConfigured()
         val imeActive = checkImeConfigured()
 
+        _isAdbConnected.value = adbActive
         _isAccessibilityEnabled.value = a11yActive
         _isImeEnabled.value = imeActive
 
-        val candidate: InputBackend = if (a11yActive) {
-            accessibilityBackend
-        } else {
-            fallbackBackend
+        val candidate: InputBackend = when {
+            adbActive -> adbBackend
+            a11yActive -> accessibilityBackend
+            else -> fallbackBackend
         }
 
         candidate.initialize()
@@ -134,6 +157,8 @@ class InputBackendManager(
     }
 
     fun release() {
+        adbBackend.release()
+        adbManager.disconnect()
         accessibilityBackend.release()
         fallbackBackend.release()
     }

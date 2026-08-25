@@ -32,6 +32,7 @@ import com.minidex.app.ui.keyboard.MacropadView
 import com.minidex.app.ui.keyboard.NavKeyboard
 import com.minidex.app.ui.keyboard.QwertyKeyboard
 import com.minidex.app.ui.keyboard.SymbolKeyboard
+import com.minidex.app.ui.settings.AdbPairingDialog
 import com.minidex.app.ui.settings.MacroEditorDialog
 import com.minidex.app.ui.settings.SettingsView
 import com.minidex.app.ui.theme.LocalMiniDexColors
@@ -48,9 +49,16 @@ fun MainScreen(viewModel: MainViewModel) {
     val activeDexDisplay by viewModel.activeDexDisplay.collectAsState()
     val availableDisplays by viewModel.availableDisplays.collectAsState()
     val activeBackend by viewModel.activeBackend.collectAsState()
+    val isAdbConnected by viewModel.isAdbConnected.collectAsState()
     val isAccessibilityEnabled by viewModel.isAccessibilityEnabled.collectAsState()
     val isImeEnabled by viewModel.isImeEnabled.collectAsState()
     val showMacroEditor by viewModel.showMacroEditor.collectAsState()
+    val showAdbPairingDialog by viewModel.showAdbPairingDialog.collectAsState()
+    val adbConnectionStatus by viewModel.adbConnectionStatus.collectAsState()
+    val adbStatusMessage by viewModel.adbStatusMessage.collectAsState()
+    val discoveredPairingPort by viewModel.discoveredPairingPort.collectAsState()
+    val discoveredConnectPort by viewModel.discoveredConnectPort.collectAsState()
+    val isShizukuAvailable by viewModel.isShizukuAvailable.collectAsState()
 
     MiniDexTheme(
         variant = preferences.themeVariant,
@@ -78,7 +86,9 @@ fun MainScreen(viewModel: MainViewModel) {
                 ) {
                     PageBar(
                         currentPage = currentPage,
-                        onPageSelected = { viewModel.selectKeyboardPage(it) }
+                        isAdbConnected = isAdbConnected,
+                        onPageSelected = { viewModel.selectKeyboardPage(it) },
+                        onAdbBadgeClick = { viewModel.setAdbPairingDialogVisible(true) }
                     )
                 }
 
@@ -172,9 +182,12 @@ fun MainScreen(viewModel: MainViewModel) {
                                                 preferences = preferences,
                                                 dexDisplayInfo = activeDexDisplay,
                                                 availableDisplays = availableDisplays,
+                                                isAdbConnected = isAdbConnected,
+                                                adbStatusMessage = adbStatusMessage,
                                                 isAccessibilityEnabled = isAccessibilityEnabled,
                                                 isImeEnabled = isImeEnabled,
                                                 activeBackendName = activeBackend.name,
+                                                onOpenAdbPairing = { viewModel.setAdbPairingDialogVisible(true) },
                                                 onOpenAccessibilitySettings = { viewModel.openAccessibilitySettings() },
                                                 onOpenImeSettings = { viewModel.openImeSettings() },
                                                 onLaunchSamsungDexTouchpad = { viewModel.launchSamsungDexTouchpad() },
@@ -201,6 +214,23 @@ fun MainScreen(viewModel: MainViewModel) {
                         onToggleMode = { viewModel.toggleAppMode() }
                     )
                 }
+            }
+
+            // Wireless ADB Pairing Dialog
+            if (showAdbPairingDialog) {
+                AdbPairingDialog(
+                    connectionStatus = adbConnectionStatus,
+                    statusMessage = adbStatusMessage,
+                    discoveredPairingPort = discoveredPairingPort,
+                    discoveredConnectPort = discoveredConnectPort,
+                    isShizukuAvailable = isShizukuAvailable,
+                    onOpenSettings = { viewModel.openWirelessDebuggingSettings() },
+                    onPairWithCode = { port, code -> viewModel.pairAdbWithCode(port, code) },
+                    onConnectDirect = { port -> viewModel.connectAdbDirect(port) },
+                    onRequestShizuku = { viewModel.requestShizukuPermission() },
+                    onSendTestEvent = { viewModel.sendAdbTestEvent() },
+                    onDismiss = { viewModel.setAdbPairingDialogVisible(false) }
+                )
             }
 
             // Macro Editor Dialog

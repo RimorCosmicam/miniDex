@@ -22,5 +22,7 @@ data class UserPreferences(
     val naturalScrolling: Boolean = false,
     val tapToClick: Boolean = true,
     val preferredBackend: String = "AUTO", // AUTO, SHIZUKU, VIRTUAL_DEVICE, FALLBACK
-    val manualDisplayId: Int = -1 // -1 = auto detect
+    val manualDisplayId: Int = -1, // -1 = auto detect
+    val adbAutoConnect: Boolean = true,
+    val adbPort: Int = 5555
 )
