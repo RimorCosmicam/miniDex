@@ -194,6 +194,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         backendManager.openImeSettings()
     }
 
+    fun launchSamsungDexTouchpad() {
+        backendManager.launchSamsungDexTouchpad()
+    }
+
     fun refreshBackend() {
         viewModelScope.launch {
             backendManager.refreshBackend()

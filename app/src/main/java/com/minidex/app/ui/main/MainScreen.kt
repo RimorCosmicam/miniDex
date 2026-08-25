@@ -175,6 +175,7 @@ fun MainScreen(viewModel: MainViewModel) {
                                                 activeBackendName = activeBackend.name,
                                                 onOpenAccessibilitySettings = { viewModel.openAccessibilitySettings() },
                                                 onOpenImeSettings = { viewModel.openImeSettings() },
+                                                onLaunchSamsungDexTouchpad = { viewModel.launchSamsungDexTouchpad() },
                                                 onUpdatePreferences = { viewModel.updatePreferences(it) }
                                             )
                                         }

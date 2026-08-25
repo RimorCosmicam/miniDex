@@ -49,6 +49,7 @@ fun SettingsView(
     activeBackendName: String,
     onOpenAccessibilitySettings: () -> Unit,
     onOpenImeSettings: () -> Unit,
+    onLaunchSamsungDexTouchpad: () -> Unit = {},
     onUpdatePreferences: ((UserPreferences) -> UserPreferences) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -150,9 +151,37 @@ fun SettingsView(
                                 fontSize = 7.5.sp
                             )
                         }
+                // Driver 3: Samsung Official Native DeX Touchpad (Hardware kernel injection)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0xFF2196F3).copy(alpha = 0.18f))
+                        .border(1.dp, Color(0xFF2196F3).copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                        .clickable { onLaunchSamsungDexTouchpad() }
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "3. Samsung Official DeX Touchpad",
+                                color = Color(0xFF90CAF9),
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Summons Samsung's system touchpad overlay",
+                                color = colors.textSecondary,
+                                fontSize = 7.5.sp
+                            )
+                        }
                         Text(
-                            text = if (isImeEnabled) "ACTIVE" else "ENABLE →",
-                            color = if (isImeEnabled) colors.accent else colors.textSecondary,
+                            text = "LAUNCH ↗",
+                            color = Color(0xFF90CAF9),
                             fontSize = 8.sp,
                             fontWeight = FontWeight.Bold
                         )

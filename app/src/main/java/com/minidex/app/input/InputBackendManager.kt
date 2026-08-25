@@ -77,6 +77,25 @@ class InputBackendManager(
         }
     }
 
+    fun launchSamsungDexTouchpad() {
+        try {
+            // Attempt 1: Samsung Desktop Launcher Touchpad Action
+            val intent = Intent("com.sec.android.app.desktoplauncher.action.SHOW_TOUCHPAD").apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.sendBroadcast(intent)
+        } catch (_: Exception) {}
+
+        try {
+            // Attempt 2: Direct component launch for Samsung DeX Pad / SystemUI Touchpad
+            val intent = Intent().apply {
+                setClassName("com.sec.android.app.desktoplauncher", "com.sec.android.app.desktoplauncher.TouchPadActivity")
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(intent)
+        } catch (_: Exception) {}
+    }
+
     private fun checkAccessibilityServiceConfigured(): Boolean {
         if (MiniDexAccessibilityService.isServiceEnabled()) return true
 

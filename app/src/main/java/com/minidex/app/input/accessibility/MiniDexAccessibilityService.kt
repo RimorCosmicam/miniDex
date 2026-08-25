@@ -24,6 +24,8 @@ class MiniDexAccessibilityService : AccessibilityService() {
         fun isServiceEnabled(): Boolean = instance != null
     }
 
+    private var lastTargetNode: AccessibilityNodeInfo? = null
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
@@ -41,21 +43,27 @@ class MiniDexAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // Event stream
+        if (event == null) return
+        val source = event.source
+        if (source != null && (source.isFocused || source.isEditable)) {
+            lastTargetNode = source
+        }
     }
 
     override fun onInterrupt() {
         Log.w(TAG, "MiniDex Accessibility Service Interrupted")
         instance = null
+        lastTargetNode = null
     }
 
     override fun onDestroy() {
         super.onDestroy()
         instance = null
+        lastTargetNode = null
     }
 
     /**
-     * Finds the active/focused node on the target DeX display.
+     * Finds the active, editable, or focused node on the target DeX display.
      */
     fun findFocusedNodeOnDisplay(displayId: Int = -1): AccessibilityNodeInfo? {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -69,23 +77,61 @@ class MiniDexAccessibilityService : AccessibilityService() {
                             val root = window.root ?: continue
                             val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
                                 ?: root.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
-                            if (focused != null) return focused
+                                ?: findEditableNodeRecursive(root)
+                            if (focused != null) {
+                                lastTargetNode = focused
+                                return focused
+                            }
                         }
                     }
                 }
             }
         }
 
-        // Fallback: active window
+        // Fallback: check cached target or active window root
+        val cached = lastTargetNode
+        if (cached != null) {
+            try {
+                if (cached.refresh()) return cached
+            } catch (_: Exception) {}
+        }
+
         val root = rootInActiveWindow ?: return null
-        return root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        val found = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
             ?: root.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
+            ?: findEditableNodeRecursive(root)
+
+        if (found != null) {
+            lastTargetNode = found
+        }
+        return found
+    }
+
+    private fun findEditableNodeRecursive(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
+        if (node == null) return null
+        if (node.isFocused && node.isEditable) return node
+        if (node.isFocused) return node
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val result = findEditableNodeRecursive(child)
+            if (result != null) return result
+        }
+        return null
     }
 
     /**
-     * Injects text directly into the focused input field on DeX.
+     * Injects text directly into the target input field on DeX.
      */
     fun injectText(text: String, displayId: Int = -1): Boolean {
+        // Copy to system clipboard first as universal delivery
+        try {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            if (clipboard != null) {
+                val clip = ClipData.newPlainText("MiniDex Input", text)
+                clipboard.setPrimaryClip(clip)
+            }
+        } catch (_: Exception) {}
+
         val node = findFocusedNodeOnDisplay(displayId)
         if (node != null) {
             val currentText = node.text?.toString() ?: ""
@@ -98,20 +144,15 @@ class MiniDexAccessibilityService : AccessibilityService() {
             }
 
             // Clipboard Paste fallback
-            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-            if (clipboard != null) {
-                val clip = ClipData.newPlainText("MiniDex Input", text)
-                clipboard.setPrimaryClip(clip)
-                if (node.performAction(AccessibilityNodeInfo.ACTION_PASTE)) {
-                    return true
-                }
+            if (node.performAction(AccessibilityNodeInfo.ACTION_PASTE)) {
+                return true
             }
         }
         return false
     }
 
     /**
-     * Dispatches key code actions (Back, Home, Enter, Del) to DeX.
+     * Dispatches key actions (Back, Home, Enter, Del) to DeX.
      */
     fun handleSpecialKey(keyCode: Int, displayId: Int = -1): Boolean {
         return when (keyCode) {
@@ -160,7 +201,7 @@ class MiniDexAccessibilityService : AccessibilityService() {
         val path = Path().apply {
             moveTo(x.coerceAtLeast(0f), y.coerceAtLeast(0f))
         }
-        val stroke = GestureDescription.StrokeDescription(path, 0, 50)
+        val stroke = GestureDescription.StrokeDescription(path, 0, 40)
         val builder = GestureDescription.Builder().addStroke(stroke)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && displayId >= 0) {
@@ -182,7 +223,7 @@ class MiniDexAccessibilityService : AccessibilityService() {
     /**
      * Dispatches a drag gesture directly to the specified DeX external display.
      */
-    fun dispatchDrag(fromX: Float, fromY: Float, toX: Float, toY: Float, displayId: Int = -1, durationMs: Long = 80): Boolean {
+    fun dispatchDrag(fromX: Float, fromY: Float, toX: Float, toY: Float, displayId: Int = -1, durationMs: Long = 60): Boolean {
         val path = Path().apply {
             moveTo(fromX.coerceAtLeast(0f), fromY.coerceAtLeast(0f))
             lineTo(toX.coerceAtLeast(0f), toY.coerceAtLeast(0f))
@@ -206,7 +247,7 @@ class MiniDexAccessibilityService : AccessibilityService() {
             moveTo(x.coerceAtLeast(0f), y.coerceAtLeast(0f))
             lineTo((x - dx).coerceAtLeast(0f), (y - dy).coerceAtLeast(0f))
         }
-        val stroke = GestureDescription.StrokeDescription(path, 0, 60)
+        val stroke = GestureDescription.StrokeDescription(path, 0, 50)
         val builder = GestureDescription.Builder().addStroke(stroke)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && displayId >= 0) {
