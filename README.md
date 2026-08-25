@@ -1,6 +1,18 @@
-# MiniDex
+<p align="center">
+  <img src="Icon/Icon-iOS-Default-1024x1024@1x.png" width="120" height="120" alt="MiniDex Logo" style="border-radius: 26px;">
+</p>
 
-> **Turn your Samsung Galaxy Z Flip7 cover screen (FlexWindow) into a tactile keyboard and touchpad for Samsung DeX.**
+<h1 align="center">MiniDex</h1>
+
+<p align="center">
+  <strong>Turn your Samsung Galaxy Z Flip7 cover screen (FlexWindow) into a tactile keyboard and touchpad for Samsung DeX.</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/RimorCosmicam/miniDex/actions/workflows/build.yml"><img src="https://github.com/RimorCosmicam/miniDex/actions/workflows/build.yml/badge.svg" alt="Build Status"></a>
+  <img src="https://img.shields.io/badge/Platform-Android%2014%2B%20%7C%20One%20UI-00E5FF" alt="Android 14+">
+  <img src="https://img.shields.io/badge/Target-Galaxy%20Z%20Flip7-00FFA3" alt="Target Z Flip7">
+</p>
 
 ---
 
@@ -88,7 +100,7 @@ Because Android isolates input injection across different displays for security,
 ### Build Commands
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/miniDex.git
+git clone https://github.com/RimorCosmicam/miniDex.git
 cd miniDex
 
 # Run Unit Tests
@@ -115,6 +127,7 @@ MiniDex is fully configured to build continuously in GitHub Actions.
 
 ```
 miniDex/
+├── Icon/                                # High-resolution source icons
 ├── app/
 │   ├── src/main/
 │   │   ├── AndroidManifest.xml          # Samsung cover screen & Shizuku manifest entries
@@ -130,7 +143,7 @@ miniDex/
 │   │   │   │   ├── settings/            # SettingsView & MacroEditorDialog
 │   │   │   │   ├── theme/               # Cyber OLED colors, typography, MaterialTheme
 │   │   │   │   └── main/                # MainCoverActivity, MainViewModel, MainScreen
-│   │   └── res/                         # Vector icons, styles, themes, and layout metadata
+│   │   └── res/                         # App icon mipmaps, drawables, styles, and themes
 │   └── build.gradle.kts
 ├── gradle/
 │   ├── libs.versions.toml               # Version catalog (Compose BOM, Kotlin 2.0, Shizuku)
