@@ -309,6 +309,8 @@ class AdbConnectionManager(
         val packageName = context.packageName
         val accessibilityComponent =
             "$packageName/com.minidex.app.input.accessibility.MiniDexAccessibilityService"
+        val imeComponent =
+            "$packageName/com.minidex.app.input.ime.MiniDexInputMethodService"
         val command =
             "current=\$(settings get secure enabled_accessibility_services); " +
                 "if [ \"\$current\" = \"null\" ] || [ -z \"\$current\" ]; then " +
@@ -316,7 +318,8 @@ class AdbConnectionManager(
                 "else case \":\$current:\" in *\":$accessibilityComponent:\"*) updated=\"\$current\" ;; " +
                 "*) updated=\"\$current:$accessibilityComponent\" ;; esac; fi; " +
                 "settings put secure enabled_accessibility_services \"\$updated\"; " +
-                "settings put secure accessibility_enabled 1"
+                "settings put secure accessibility_enabled 1; " +
+                "ime enable '$imeComponent'"
         return runCatching {
             val output = if (useShizuku) {
                 val process = spawnShizukuProcess(arrayOf("sh", "-c", command))
