@@ -21,6 +21,7 @@ data class UserPreferences(
     val pointerAcceleration: Float = 0.5f,
     val scrollSensitivity: Float = 1.0f,
     val naturalScrolling: Boolean = false,
+    val edgeScrollOnRight: Boolean = false,
     val tapToClick: Boolean = true,
     val cursorMode: CursorMode = CursorMode.AUTO_NATIVE,
     val preferredBackend: String = "AUTO", // AUTO, SHIZUKU, VIRTUAL_DEVICE, FALLBACK

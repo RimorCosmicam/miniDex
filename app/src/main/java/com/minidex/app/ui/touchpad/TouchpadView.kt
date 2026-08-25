@@ -9,7 +9,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,6 +33,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInteropFilter
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -68,6 +72,9 @@ fun TouchpadView(
     var totalMovedDistance by remember { mutableFloatStateOf(0f) }
     var pointerCount by remember { mutableIntStateOf(0) }
     var isDragging by remember { mutableStateOf(false) }
+    var isEdgeScrolling by remember { mutableStateOf(false) }
+    var touchpadWidthPx by remember { mutableIntStateOf(0) }
+    val edgeWidthPx = with(LocalDensity.current) { 48.dp.toPx() }
 
     // Visual touch indicator ripples
     val ripples = remember { mutableStateListOf<TouchRipple>() }
@@ -88,6 +95,7 @@ fun TouchpadView(
                 shape
             )
             .border(1.dp, colors.border.copy(alpha = 0.4f), shape)
+            .onSizeChanged { touchpadWidthPx = it.width }
             .pointerInteropFilter { motionEvent ->
                 val now = SystemClock.uptimeMillis()
                 pointerCount = motionEvent.pointerCount
@@ -98,10 +106,15 @@ fun TouchpadView(
                         lastTouchY = motionEvent.y
                         touchDownTime = now
                         totalMovedDistance = 0f
+                        isEdgeScrolling = if (userPreferences.edgeScrollOnRight) {
+                            motionEvent.x >= touchpadWidthPx - edgeWidthPx
+                        } else {
+                            motionEvent.x <= edgeWidthPx
+                        }
 
                         // Check for Double-tap-and-drag
                         val timeSinceLastTap = now - lastTapTime
-                        if (timeSinceLastTap < 280L) {
+                        if (!isEdgeScrolling && timeSinceLastTap < 280L) {
                             isDragging = true
                             onPointerDown(1) // Hold Left Button for drag
                             onHapticClick()
@@ -115,6 +128,7 @@ fun TouchpadView(
                     MotionEvent.ACTION_POINTER_DOWN -> {
                         // Multi-touch started (e.g. 2 fingers)
                         if (motionEvent.pointerCount == 2) {
+                            isEdgeScrolling = false
                             lastTouchX = (motionEvent.getX(0) + motionEvent.getX(1)) / 2f
                             lastTouchY = (motionEvent.getY(0) + motionEvent.getY(1)) / 2f
                             touchDownTime = now
@@ -132,14 +146,23 @@ fun TouchpadView(
 
                             totalMovedDistance += hypot(rawDx, rawDy)
 
-                            val (dx, dy) = TouchpadKinematics.calculatePointerDelta(
-                                rawDx = rawDx,
-                                rawDy = rawDy,
-                                sensitivity = userPreferences.pointerSensitivity,
-                                acceleration = userPreferences.pointerAcceleration
-                            )
-
-                            onPointerMove(dx, dy)
+                            if (isEdgeScrolling) {
+                                val (scrollX, scrollY) = TouchpadKinematics.calculateScrollDelta(
+                                    rawDx = 0f,
+                                    rawDy = rawDy,
+                                    scrollSensitivity = userPreferences.scrollSensitivity,
+                                    naturalScrolling = userPreferences.naturalScrolling
+                                )
+                                onScroll(scrollX, scrollY)
+                            } else {
+                                val (dx, dy) = TouchpadKinematics.calculatePointerDelta(
+                                    rawDx = rawDx,
+                                    rawDy = rawDy,
+                                    sensitivity = userPreferences.pointerSensitivity,
+                                    acceleration = userPreferences.pointerAcceleration
+                                )
+                                onPointerMove(dx, dy)
+                            }
                             lastTouchX = currentX
                             lastTouchY = currentY
                         } else if (motionEvent.pointerCount == 2) {
@@ -176,7 +199,9 @@ fun TouchpadView(
 
                     MotionEvent.ACTION_UP -> {
                         val duration = now - touchDownTime
-                        if (isDragging) {
+                        if (isEdgeScrolling) {
+                            isEdgeScrolling = false
+                        } else if (isDragging) {
                             isDragging = false
                             onPointerUp(1) // Release drag
                             onHapticClick()
@@ -200,6 +225,7 @@ fun TouchpadView(
                     }
 
                     MotionEvent.ACTION_CANCEL -> {
+                        isEdgeScrolling = false
                         if (isDragging) {
                             isDragging = false
                             onPointerUp(1)
@@ -243,6 +269,35 @@ fun TouchpadView(
             }
         }
 
+        // A dedicated edge strip behaves like the physical scroll zones on old touchpads.
+        Canvas(
+            modifier = Modifier
+                .align(if (userPreferences.edgeScrollOnRight) Alignment.CenterEnd else Alignment.CenterStart)
+                .fillMaxHeight()
+                .width(48.dp)
+        ) {
+            drawRect(colors.accent.copy(alpha = if (isEdgeScrolling) 0.16f else 0.06f))
+            val lineX = if (userPreferences.edgeScrollOnRight) size.width - 3.dp.toPx() else 3.dp.toPx()
+            drawLine(
+                color = colors.accent.copy(alpha = if (isEdgeScrolling) 0.9f else 0.4f),
+                start = Offset(lineX, 12.dp.toPx()),
+                end = Offset(lineX, size.height - 12.dp.toPx()),
+                strokeWidth = 2.dp.toPx()
+            )
+            val centerX = size.width / 2f
+            val tickHalfWidth = 7.dp.toPx()
+            var y = 32.dp.toPx()
+            while (y < size.height - 24.dp.toPx()) {
+                drawLine(
+                    color = colors.accent.copy(alpha = if (isEdgeScrolling) 0.8f else 0.3f),
+                    start = Offset(centerX - tickHalfWidth, y),
+                    end = Offset(centerX + tickHalfWidth, y),
+                    strokeWidth = 1.dp.toPx()
+                )
+                y += 22.dp.toPx()
+            }
+        }
+
         // Overlay status indicator
         Text(
             text = if (isDragging) "DRAGGING" else "TOUCHPAD",
@@ -257,7 +312,7 @@ fun TouchpadView(
 
         // Helper gestures hint
         Text(
-            text = "1-Finger: Point/Tap  •  2-Finger: Scroll/Right-Click",
+            text = "Edge: Scroll  •  1-Finger: Point/Tap  •  2-Finger: Scroll/Right-Click",
             color = colors.textSecondary.copy(alpha = 0.3f),
             fontSize = 8.sp,
             fontWeight = FontWeight.Normal,

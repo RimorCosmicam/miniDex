@@ -2,6 +2,8 @@ package com.minidex.app.input
 
 import android.util.Log
 import android.view.KeyEvent
+import android.os.Handler
+import android.os.Looper
 import com.minidex.app.domain.model.CursorMode
 import com.minidex.app.input.accessibility.MiniDexAccessibilityService
 import com.minidex.app.input.adb.AdbConnectionManager
@@ -38,6 +40,12 @@ class AdbInputBackend(
     private var dragDisplayId = -1
     private var cursorMode = CursorMode.AUTO_NATIVE
     private var targetDisplayId = -1
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var pendingScrollX = 0f
+    private var pendingScrollY = 0f
+    private var pendingScrollDisplayId = -1
+    private var scrollFlushScheduled = false
+    private val flushScroll = Runnable { flushPendingScroll() }
 
     fun setCursorMode(mode: CursorMode) {
         cursorMode = mode
@@ -149,6 +157,7 @@ class AdbInputBackend(
 
     override fun sendPointerClick(button: Int, displayId: Int): Boolean {
         if (!isAvailable) return false
+        adbManager.guardNextLaunchOnDisplay(displayId)
         if (button == 1 && MiniDexAccessibilityService.instance?.dispatchClick(
                 cursorX,
                 cursorY,
@@ -166,26 +175,48 @@ class AdbInputBackend(
 
     override fun sendScroll(dx: Float, dy: Float, displayId: Int): Boolean {
         if (!isAvailable) return false
+        pendingScrollX += dx
+        pendingScrollY += dy
+        pendingScrollDisplayId = displayId
+        if (!scrollFlushScheduled) {
+            scrollFlushScheduled = true
+            mainHandler.postDelayed(flushScroll, 60L)
+        }
+        return true
+    }
+
+    private fun flushPendingScroll() {
+        scrollFlushScheduled = false
+        val dx = pendingScrollX
+        val dy = pendingScrollY
+        val displayId = pendingScrollDisplayId
+        pendingScrollX = 0f
+        pendingScrollY = 0f
+        if (displayId < 0 || (dx == 0f && dy == 0f)) return
         val startX = cursorX.toInt()
         val startY = cursorY.toInt()
-        val endX = (cursorX + dx * 2f).coerceIn(0f, displayWidth - 1f).toInt()
-        val endY = (cursorY - dy * 2f).coerceIn(0f, displayHeight - 1f).toInt()
+        val gestureX = dx * 12f
+        val gestureY = dy * 12f
+        val endX = (cursorX + gestureX).coerceIn(0f, displayWidth - 1f).toInt()
+        val endY = (cursorY - gestureY).coerceIn(0f, displayHeight - 1f).toInt()
 
         if (MiniDexAccessibilityService.instance?.dispatchScroll(
                 cursorX,
                 cursorY,
-                dx * 2f,
-                dy * 2f,
+                gestureX,
+                gestureY,
                 displayId
             ) == true
-        ) return true
+        ) return
 
         val cmd = "${inputPrefix("touchscreen", displayId)} swipe $startX $startY $endX $endY 50"
-        return adbManager.sendCommand(cmd)
+        adbManager.sendCommand(cmd)
     }
 
     override fun release() {
         isDragging = false
+        mainHandler.removeCallbacks(flushScroll)
+        scrollFlushScheduled = false
         fakeCursor.remove()
     }
 }

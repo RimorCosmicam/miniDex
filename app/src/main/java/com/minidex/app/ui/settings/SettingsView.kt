@@ -300,6 +300,7 @@ fun SettingsView(
                             }
                         }
                     }
+
                 }
             }
         }
@@ -442,6 +443,53 @@ fun SettingsView(
                                     uncheckedTrackColor = colors.surfaceElevated
                                 )
                             )
+                        }
+                    }
+
+                    SettingsDivider()
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                        verticalArrangement = Arrangement.spacedBy(7.dp)
+                    ) {
+                        Text(text = "Edge Scroll Side", color = colors.textPrimary, fontSize = 13.sp)
+                        Text(
+                            text = "Use the marked edge like a physical scroll strip",
+                            color = colors.textSecondary,
+                            fontSize = 10.sp
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf(false to "Left", true to "Right").forEach { (rightSide, label) ->
+                                val selected = preferences.edgeScrollOnRight == rightSide
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(if (selected) colors.accent.copy(alpha = 0.25f) else colors.surfaceElevated)
+                                        .border(
+                                            1.dp,
+                                            if (selected) colors.accent else colors.border.copy(alpha = 0.4f),
+                                            RoundedCornerShape(6.dp)
+                                        )
+                                        .clickable {
+                                            onUpdatePreferences { it.copy(edgeScrollOnRight = rightSide) }
+                                        }
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = label,
+                                        color = if (selected) colors.accent else colors.textSecondary,
+                                        fontSize = 11.sp,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
+                            }
                         }
                     }
                 }

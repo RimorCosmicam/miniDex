@@ -35,6 +35,7 @@ class UserPreferencesRepository(private val context: Context) {
         val POINTER_ACCELERATION = floatPreferencesKey("pointer_acceleration")
         val SCROLL_SENSITIVITY = floatPreferencesKey("scroll_sensitivity")
         val NATURAL_SCROLLING = booleanPreferencesKey("natural_scrolling")
+        val EDGE_SCROLL_ON_RIGHT = booleanPreferencesKey("edge_scroll_on_right")
         val TAP_TO_CLICK = booleanPreferencesKey("tap_to_click")
         val CURSOR_MODE = stringPreferencesKey("cursor_mode")
         val PREFERRED_BACKEND = stringPreferencesKey("preferred_backend")
@@ -73,6 +74,7 @@ class UserPreferencesRepository(private val context: Context) {
             pointerAcceleration = prefs[Keys.POINTER_ACCELERATION] ?: 0.5f,
             scrollSensitivity = prefs[Keys.SCROLL_SENSITIVITY] ?: 1.0f,
             naturalScrolling = prefs[Keys.NATURAL_SCROLLING] ?: false,
+            edgeScrollOnRight = prefs[Keys.EDGE_SCROLL_ON_RIGHT] ?: false,
             tapToClick = prefs[Keys.TAP_TO_CLICK] ?: true,
             cursorMode = try {
                 CursorMode.valueOf(prefs[Keys.CURSOR_MODE] ?: CursorMode.AUTO_NATIVE.name)
@@ -117,6 +119,7 @@ class UserPreferencesRepository(private val context: Context) {
                 pointerAcceleration = prefs[Keys.POINTER_ACCELERATION] ?: 0.5f,
                 scrollSensitivity = prefs[Keys.SCROLL_SENSITIVITY] ?: 1.0f,
                 naturalScrolling = prefs[Keys.NATURAL_SCROLLING] ?: false,
+                edgeScrollOnRight = prefs[Keys.EDGE_SCROLL_ON_RIGHT] ?: false,
                 tapToClick = prefs[Keys.TAP_TO_CLICK] ?: true,
                 cursorMode = try {
                     CursorMode.valueOf(prefs[Keys.CURSOR_MODE] ?: CursorMode.AUTO_NATIVE.name)
@@ -142,6 +145,7 @@ class UserPreferencesRepository(private val context: Context) {
             prefs[Keys.POINTER_ACCELERATION] = updated.pointerAcceleration
             prefs[Keys.SCROLL_SENSITIVITY] = updated.scrollSensitivity
             prefs[Keys.NATURAL_SCROLLING] = updated.naturalScrolling
+            prefs[Keys.EDGE_SCROLL_ON_RIGHT] = updated.edgeScrollOnRight
             prefs[Keys.TAP_TO_CLICK] = updated.tapToClick
             prefs[Keys.CURSOR_MODE] = updated.cursorMode.name
             prefs[Keys.PREFERRED_BACKEND] = updated.preferredBackend
