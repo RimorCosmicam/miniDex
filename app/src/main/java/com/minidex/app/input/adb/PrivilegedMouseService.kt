@@ -75,28 +75,47 @@ class PrivilegedMouseService private constructor() : IMouseControl.Stub() {
         if (displayId < 0) return
         val before = getRunningTasks()
         val beforeIds = before.mapTo(HashSet()) { it.taskId }
-        val beforeFocusedId = before.firstOrNull { it.isFocused }?.taskId ?: -1
+        val beforeFocusedId = before.firstOrNull(::taskIsFocused)?.taskId ?: -1
         val generation = ++launchGuardGeneration
         longArrayOf(250L, 600L, 1_100L).forEach { delayMs ->
             handler.postDelayed({
                 if (generation != launchGuardGeneration) return@postDelayed
                 val tasks = getRunningTasks()
                 val candidate = tasks.firstOrNull { task ->
-                    task.displayId != displayId &&
+                    taskDisplayId(task) != displayId &&
                         task.topActivity?.packageName != appPackageName &&
                         (task.taskId !in beforeIds ||
-                            (task.isFocused && task.taskId != beforeFocusedId))
+                            (taskIsFocused(task) && task.taskId != beforeFocusedId))
                 }
                 if (candidate != null && moveTaskToDisplay(candidate.taskId, displayId)) {
                     launchGuardGeneration++
                     Log.i(
                         TAG,
-                        "Moved task ${candidate.taskId} from display ${candidate.displayId} to $displayId"
+                        "Moved task ${candidate.taskId} from display ${taskDisplayId(candidate)} to $displayId"
                     )
                 }
             }, delayMs)
         }
     }
+
+    private fun reflectedField(instance: Any, name: String): Any? {
+        var type: Class<*>? = instance.javaClass
+        while (type != null) {
+            val currentType = type
+            val value = runCatching {
+                currentType.getDeclaredField(name).apply { isAccessible = true }.get(instance)
+            }
+            if (value.isSuccess) return value.getOrNull()
+            type = currentType.superclass
+        }
+        return null
+    }
+
+    private fun taskDisplayId(task: ActivityManager.RunningTaskInfo): Int =
+        reflectedField(task, "displayId") as? Int ?: -1
+
+    private fun taskIsFocused(task: ActivityManager.RunningTaskInfo): Boolean =
+        reflectedField(task, "isFocused") as? Boolean ?: false
 
     private fun activityTaskManagerService(): Any {
         return Class.forName("android.app.ActivityTaskManager")
