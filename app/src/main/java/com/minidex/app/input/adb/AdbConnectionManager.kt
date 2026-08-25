@@ -305,7 +305,7 @@ class AdbConnectionManager(
         }
     }
 
-    private fun grantOverlayPermission(useShizuku: Boolean): Boolean {
+    private suspend fun grantOverlayPermission(useShizuku: Boolean): Boolean {
         val packageName = context.packageName
         val command =
             "appops set '$packageName' android:system_alert_window allow 2>/dev/null || " +
