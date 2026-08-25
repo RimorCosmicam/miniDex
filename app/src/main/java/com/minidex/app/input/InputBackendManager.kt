@@ -37,7 +37,8 @@ class InputBackendManager(
     }
 
     val adbManager = AdbConnectionManager(context, scope)
-    val adbBackend = AdbInputBackend(adbManager)
+    private val fakeCursor = FakeCursorOverlay(context)
+    val adbBackend = AdbInputBackend(adbManager, fakeCursor)
     val accessibilityBackend = AccessibilityInputBackend(context)
     val fallbackBackend = FallbackInputBackend()
 

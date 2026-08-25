@@ -8,7 +8,8 @@ import com.minidex.app.input.adb.AdbConnectionStatus
 
 /** Sends keyboard and pointer input through an authenticated Wireless ADB connection. */
 class AdbInputBackend(
-    val adbManager: AdbConnectionManager
+    val adbManager: AdbConnectionManager,
+    private val fakeCursor: FakeCursorOverlay
 ) : InputBackend {
 
     companion object {
@@ -36,18 +37,21 @@ class AdbInputBackend(
     private var scrollRemainderX = 0f
     private var scrollRemainderY = 0f
     private var cursorMode = CursorMode.AUTO_NATIVE
+    private var targetDisplayId = -1
 
     fun setCursorMode(mode: CursorMode) {
         cursorMode = mode
         adbManager.setCursorMode(mode)
     }
 
-    fun setDisplayBounds(width: Int, height: Int) {
+    fun setDisplayBounds(displayId: Int, width: Int, height: Int) {
         if (width <= 0 || height <= 0) return
+        targetDisplayId = displayId
         displayWidth = width.toFloat()
         displayHeight = height.toFloat()
         cursorX = cursorX.coerceIn(0f, displayWidth - 1f)
         cursorY = cursorY.coerceIn(0f, displayHeight - 1f)
+        fakeCursor.showAt(displayId, cursorX, cursorY)
     }
 
     override suspend fun initialize(): Result<Unit> {
@@ -114,9 +118,11 @@ class AdbInputBackend(
         val relativeY = totalY.toInt()
         hidRemainderX = totalX - relativeX
         hidRemainderY = totalY - relativeY
-        if (adbManager.sendHidPointerMove(relativeX, relativeY)) return true
+        targetDisplayId = displayId
+        fakeCursor.showAt(displayId, cursorX, cursorY)
 
-        // Compatibility fallback for devices whose ROM omits Android's `hid` command.
+        // The visible overlay is authoritative. Keep hover state synchronized,
+        // but do not depend on Android rendering its hidden hardware cursor.
         val cmd = "${inputPrefix("mouse", displayId)} motionevent MOVE ${cursorX.toInt()} ${cursorY.toInt()}"
         return adbManager.sendCommand(cmd)
     }
@@ -124,7 +130,6 @@ class AdbInputBackend(
     override fun sendPointerDown(button: Int, displayId: Int): Boolean {
         if (!isAvailable) return false
         isDragging = true
-        if (adbManager.sendHidPointerButton(button, true)) return true
         val cmd = "${inputPrefix("mouse", displayId)} motionevent DOWN ${cursorX.toInt()} ${cursorY.toInt()}"
         return adbManager.sendCommand(cmd)
     }
@@ -132,14 +137,12 @@ class AdbInputBackend(
     override fun sendPointerUp(button: Int, displayId: Int): Boolean {
         if (!isAvailable) return false
         isDragging = false
-        if (adbManager.sendHidPointerButton(button, false)) return true
         val cmd = "${inputPrefix("mouse", displayId)} motionevent UP ${cursorX.toInt()} ${cursorY.toInt()}"
         return adbManager.sendCommand(cmd)
     }
 
     override fun sendPointerClick(button: Int, displayId: Int): Boolean {
         if (!isAvailable) return false
-        if (adbManager.sendHidPointerClick(button)) return true
         val cmd = if (button == 2) {
             // Secondary / Right Click: context menu key or tap
             "${inputPrefix("keyboard", displayId)} keyevent ${KeyEvent.KEYCODE_MENU}"
@@ -170,7 +173,12 @@ class AdbInputBackend(
     }
 
     override fun release() {
-        if (isDragging) adbManager.sendHidPointerButton(1, false)
+        if (isDragging) {
+            adbManager.sendCommand(
+                "${inputPrefix("mouse", targetDisplayId)} motionevent UP ${cursorX.toInt()} ${cursorY.toInt()}"
+            )
+        }
         isDragging = false
+        fakeCursor.remove()
     }
 }

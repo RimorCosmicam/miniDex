@@ -268,13 +268,9 @@ class AdbConnectionManager(
                     if (process != null) {
                         shizukuProcess = process
                         shizukuOutputStream = process.outputStream
-                        val hidReady = startCursorTransport(useShizuku = true)
+                        grantOverlayPermission(useShizuku = true)
                         _status.value = AdbConnectionStatus.CONNECTED
-                        _statusMessage.value = if (hidReady) {
-                            "Connected via Shizuku (hardware mouse active)"
-                        } else {
-                            "Connected via Shizuku (mouse compatibility mode)"
-                        }
+                        _statusMessage.value = "Connected via Shizuku"
                         isConnecting.set(false)
                         return@withContext Result.success(true)
                     }
@@ -294,14 +290,10 @@ class AdbConnectionManager(
             }
             Log.i(TAG, "ADB shell test output: $testOutput")
 
-            val hidReady = startCursorTransport(useShizuku = false)
+            grantOverlayPermission(useShizuku = false)
 
             _status.value = AdbConnectionStatus.CONNECTED
-            _statusMessage.value = if (hidReady) {
-                "Connected to ADB (hardware mouse active)"
-            } else {
-                "Connected to ADB (mouse compatibility mode)"
-            }
+            _statusMessage.value = "Connected to ADB"
             Result.success(true)
         } catch (e: Exception) {
             Log.e(TAG, "ADB connect error on $host:$port", e)
@@ -310,6 +302,29 @@ class AdbConnectionManager(
             Result.failure(e)
         } finally {
             isConnecting.set(false)
+        }
+    }
+
+    private fun grantOverlayPermission(useShizuku: Boolean): Boolean {
+        val packageName = context.packageName
+        val command =
+            "appops set '$packageName' android:system_alert_window allow 2>/dev/null || " +
+                "appops set '$packageName' SYSTEM_ALERT_WINDOW allow"
+        return runCatching {
+            val output = if (useShizuku) {
+                val process = spawnShizukuProcess(arrayOf("sh", "-c", command))
+                    ?: return false
+                val text = process.inputStream.bufferedReader().readText()
+                check(process.waitFor() == 0) { text }
+                text
+            } else {
+                pairingClient.executeShell(command)
+            }
+            Log.i(TAG, "Fake cursor overlay permission granted: ${output.trim()}")
+            true
+        }.getOrElse {
+            Log.e(TAG, "Could not grant fake cursor overlay permission", it)
+            false
         }
     }
 

@@ -227,7 +227,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun syncAdbPointerBounds() {
         val display = availableDisplays.value.firstOrNull { it.displayId == targetDisplayId }
             ?: activeDexDisplay.value
-        backendManager.adbBackend.setDisplayBounds(display.width, display.height)
+        backendManager.adbBackend.setDisplayBounds(display.displayId, display.width, display.height)
     }
 
     fun updatePreferences(transform: (UserPreferences) -> UserPreferences) {
