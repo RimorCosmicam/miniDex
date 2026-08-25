@@ -10,7 +10,6 @@ import android.hardware.display.DisplayManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
 import android.view.View
@@ -30,21 +29,22 @@ class FakeCursorOverlay(private val appContext: Context) {
     private var cursorView: View? = null
     private var layoutParams: WindowManager.LayoutParams? = null
     private var activeDisplayId = -1
-    private var activeAccessibilityLayer = false
+    private var retryScheduled = false
+    private var pendingDisplayId = -1
+    private var pendingX = 0f
+    private var pendingY = 0f
 
     fun showAt(displayId: Int, x: Float, y: Float) {
         if (displayId < 0) return
+        pendingDisplayId = displayId
+        pendingX = x
+        pendingY = y
         mainHandler.post {
-            val accessibilityService = MiniDexAccessibilityService.instance
-            if (accessibilityService == null && !Settings.canDrawOverlays(appContext)) {
-                Log.w(TAG, "Overlay permission has not been granted")
+            val accessibilityService = MiniDexAccessibilityService.instance ?: run {
+                scheduleRetry()
                 return@post
             }
-            val wantsAccessibilityLayer = accessibilityService != null
-            if (activeDisplayId != displayId ||
-                cursorView == null ||
-                activeAccessibilityLayer != wantsAccessibilityLayer
-            ) {
+            if (activeDisplayId != displayId || cursorView == null) {
                 attachToDisplay(displayId, accessibilityService)
             }
             val view = cursorView ?: return@post
@@ -60,20 +60,24 @@ class FakeCursorOverlay(private val appContext: Context) {
         mainHandler.post { removeNow() }
     }
 
+    private fun scheduleRetry() {
+        if (retryScheduled) return
+        retryScheduled = true
+        mainHandler.postDelayed({
+            retryScheduled = false
+            if (pendingDisplayId >= 0) showAt(pendingDisplayId, pendingX, pendingY)
+        }, 250L)
+    }
+
     private fun attachToDisplay(
         displayId: Int,
-        accessibilityService: MiniDexAccessibilityService?
+        accessibilityService: MiniDexAccessibilityService
     ) {
         removeNow()
         val displayManager = appContext.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
         val display = displayManager.getDisplay(displayId) ?: return
-        val baseContext = accessibilityService ?: appContext
-        val windowType = if (accessibilityService != null) {
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
-        } else {
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        }
-        val displayContext = baseContext.createDisplayContext(display)
+        val windowType = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+        val displayContext = accessibilityService.createDisplayContext(display)
         val windowContext = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             displayContext.createWindowContext(
                 windowType,
@@ -103,13 +107,11 @@ class FakeCursorOverlay(private val appContext: Context) {
                 cursorView = view
                 layoutParams = params
                 activeDisplayId = displayId
-                activeAccessibilityLayer = accessibilityService != null
-                val layer = if (accessibilityService != null) "accessibility" else "application"
-                Log.i(TAG, "Fake cursor attached to display $displayId on $layer overlay layer")
+                Log.i(TAG, "Fake cursor attached to display $displayId on highest available layer")
             }
             .onFailure {
                 Log.e(TAG, "Could not attach fake cursor to display $displayId", it)
-                if (accessibilityService != null) attachToDisplay(displayId, null)
+                scheduleRetry()
             }
     }
 
@@ -120,7 +122,6 @@ class FakeCursorOverlay(private val appContext: Context) {
         cursorView = null
         layoutParams = null
         activeDisplayId = -1
-        activeAccessibilityLayer = false
     }
 
     private class CursorView(context: Context) : View(context) {

@@ -268,7 +268,7 @@ class AdbConnectionManager(
                     if (process != null) {
                         shizukuProcess = process
                         shizukuOutputStream = process.outputStream
-                        grantOverlayPermission(useShizuku = true)
+                        grantCursorPermissions(useShizuku = true)
                         startCursorTransport(useShizuku = true)
                         _status.value = AdbConnectionStatus.CONNECTED
                         _statusMessage.value = "Connected via Shizuku"
@@ -291,7 +291,7 @@ class AdbConnectionManager(
             }
             Log.i(TAG, "ADB shell test output: $testOutput")
 
-            grantOverlayPermission(useShizuku = false)
+            grantCursorPermissions(useShizuku = false)
             startCursorTransport(useShizuku = false)
 
             _status.value = AdbConnectionStatus.CONNECTED
@@ -307,11 +307,18 @@ class AdbConnectionManager(
         }
     }
 
-    private suspend fun grantOverlayPermission(useShizuku: Boolean): Boolean {
+    private suspend fun grantCursorPermissions(useShizuku: Boolean): Boolean {
         val packageName = context.packageName
+        val accessibilityComponent =
+            "$packageName/com.minidex.app.input.accessibility.MiniDexAccessibilityService"
         val command =
-            "appops set '$packageName' android:system_alert_window allow 2>/dev/null || " +
-                "appops set '$packageName' SYSTEM_ALERT_WINDOW allow"
+            "current=\$(settings get secure enabled_accessibility_services); " +
+                "if [ \"\$current\" = \"null\" ] || [ -z \"\$current\" ]; then " +
+                "updated='$accessibilityComponent'; " +
+                "else case \":\$current:\" in *\":$accessibilityComponent:\"*) updated=\"\$current\" ;; " +
+                "*) updated=\"\$current:$accessibilityComponent\" ;; esac; fi; " +
+                "settings put secure enabled_accessibility_services \"\$updated\"; " +
+                "settings put secure accessibility_enabled 1"
         return runCatching {
             val output = if (useShizuku) {
                 val process = spawnShizukuProcess(arrayOf("sh", "-c", command))
@@ -322,10 +329,10 @@ class AdbConnectionManager(
             } else {
                 pairingClient.executeShell(command)
             }
-            Log.i(TAG, "Fake cursor overlay permission granted: ${output.trim()}")
+            Log.i(TAG, "Highest cursor overlay permissions granted: ${output.trim()}")
             true
         }.getOrElse {
-            Log.e(TAG, "Could not grant fake cursor overlay permission", it)
+            Log.e(TAG, "Could not grant highest cursor overlay permissions", it)
             false
         }
     }
