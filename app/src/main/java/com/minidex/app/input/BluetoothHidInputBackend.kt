@@ -13,42 +13,41 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
 
 /**
  * Native Bluetooth HID Input Backend.
- * Turns the Galaxy Z Flip7 into a real Bluetooth Keyboard & Mouse for Samsung DeX.
+ * Emulates a standard physical USB/Bluetooth Keyboard & Mouse directly over Bluetooth.
  *
- * Flow:
- * 1. App registers as BluetoothHidDevice with SDP name "MiniDex"
- * 2. User triggers discoverable mode so the host can find "MiniDex"
- * 3. Host (DeX PC, TV, tablet, etc.) pairs with "MiniDex"
- * 4. MiniDex sends HID keyboard & mouse reports over Bluetooth
+ * App Name in Bluetooth: "MiniDex Keyboard & Mouse"
  */
-class BluetoothHidInputBackend(private val context: Context) : InputBackend {
+class BluetoothHidInputBackend(
+    private val context: Context,
+    private val scope: CoroutineScope = CoroutineScope(Dispatchers.Main)
+) : InputBackend {
 
     companion object {
         private const val TAG = "BluetoothHidBackend"
         private const val REPORT_ID_KEYBOARD = 1
         private const val REPORT_ID_MOUSE = 2
 
-        /** The name this device will show as in Bluetooth pairing dialogs. */
-        const val BT_DEVICE_NAME = "MiniDex"
+        const val BT_DEVICE_NAME = "MiniDex Keyboard & Mouse"
+        const val DISCOVERABLE_DURATION = 300 // 5 minutes
 
-        /** Discoverable duration in seconds (5 minutes). */
-        const val DISCOVERABLE_DURATION = 300
-
-        // Standard USB HID Keyboard & Mouse Report Descriptor
+        // Standard USB-IF HID Combo (Keyboard + Mouse) Report Descriptor
         private val HID_REPORT_DESCRIPTOR = byteArrayOf(
-            // Keyboard
+            // --- KEYBOARD (Report ID 1) ---
             0x05.toByte(), 0x01.toByte(), // USAGE_PAGE (Generic Desktop)
             0x09.toByte(), 0x06.toByte(), // USAGE (Keyboard)
             0xa1.toByte(), 0x01.toByte(), // COLLECTION (Application)
             0x85.toByte(), REPORT_ID_KEYBOARD.toByte(), // REPORT_ID (1)
-            0x05.toByte(), 0x07.toByte(), // USAGE_PAGE (Keyboard)
+            0x05.toByte(), 0x07.toByte(), // USAGE_PAGE (Keyboard/Keypad)
             0x19.toByte(), 0xe0.toByte(), // USAGE_MINIMUM (Keyboard LeftControl)
             0x29.toByte(), 0xe7.toByte(), // USAGE_MAXIMUM (Keyboard Right GUI)
             0x15.toByte(), 0x00.toByte(), // LOGICAL_MINIMUM (0)
@@ -58,18 +57,18 @@ class BluetoothHidInputBackend(private val context: Context) : InputBackend {
             0x81.toByte(), 0x02.toByte(), // INPUT (Data,Var,Abs)
             0x95.toByte(), 0x01.toByte(), // REPORT_COUNT (1)
             0x75.toByte(), 0x08.toByte(), // REPORT_SIZE (8)
-            0x81.toByte(), 0x01.toByte(), // INPUT (Cnst,Var,Abs)
+            0x81.toByte(), 0x03.toByte(), // INPUT (Cnst,Var,Abs)
             0x95.toByte(), 0x06.toByte(), // REPORT_COUNT (6)
             0x75.toByte(), 0x08.toByte(), // REPORT_SIZE (8)
             0x15.toByte(), 0x00.toByte(), // LOGICAL_MINIMUM (0)
             0x25.toByte(), 0x65.toByte(), // LOGICAL_MAXIMUM (101)
-            0x05.toByte(), 0x07.toByte(), // USAGE_PAGE (Keyboard)
+            0x05.toByte(), 0x07.toByte(), // USAGE_PAGE (Keyboard/Keypad)
             0x19.toByte(), 0x00.toByte(), // USAGE_MINIMUM (Reserved)
             0x29.toByte(), 0x65.toByte(), // USAGE_MAXIMUM (Keyboard Application)
             0x81.toByte(), 0x00.toByte(), // INPUT (Data,Ary,Abs)
             0xc0.toByte(),                // END_COLLECTION
 
-            // Mouse
+            // --- MOUSE (Report ID 2) ---
             0x05.toByte(), 0x01.toByte(), // USAGE_PAGE (Generic Desktop)
             0x09.toByte(), 0x02.toByte(), // USAGE (Mouse)
             0xa1.toByte(), 0x01.toByte(), // COLLECTION (Application)
@@ -86,7 +85,7 @@ class BluetoothHidInputBackend(private val context: Context) : InputBackend {
             0x81.toByte(), 0x02.toByte(), // INPUT (Data,Var,Abs)
             0x75.toByte(), 0x05.toByte(), // REPORT_SIZE (5)
             0x95.toByte(), 0x01.toByte(), // REPORT_COUNT (1)
-            0x81.toByte(), 0x01.toByte(), // INPUT (Cnst,Ary,Abs)
+            0x81.toByte(), 0x03.toByte(), // INPUT (Cnst,Var,Abs)
             0x05.toByte(), 0x01.toByte(), // USAGE_PAGE (Generic Desktop)
             0x09.toByte(), 0x30.toByte(), // USAGE (X)
             0x09.toByte(), 0x31.toByte(), // USAGE (Y)
@@ -102,18 +101,17 @@ class BluetoothHidInputBackend(private val context: Context) : InputBackend {
     }
 
     override val id: String = "BLUETOOTH_HID"
-    override val name: String = "Bluetooth HID (MiniDex)"
+    override val name: String = "Bluetooth HID (Hardware Emulation)"
     override val requiresPrivilegedAccess: Boolean = false
 
     override val isAvailable: Boolean
-        get() = hasBluetoothPermissions() && hidDevice != null
+        get() = hasBluetoothPermissions() && hidDevice != null && isRegistered
 
     private var hidDevice: BluetoothHidDevice? = null
     private var connectedHostDevice: BluetoothDevice? = null
     private val executor = Executors.newSingleThreadExecutor()
 
     private var mouseButtons: Byte = 0
-    private var originalAdapterName: String? = null
     private var isRegistered: Boolean = false
 
     private val _connectionState = MutableStateFlow<BluetoothHidConnectionState>(BluetoothHidConnectionState.Disconnected)
@@ -122,38 +120,46 @@ class BluetoothHidInputBackend(private val context: Context) : InputBackend {
     private val _lastError = MutableStateFlow<String?>(null)
     val lastError: StateFlow<String?> = _lastError.asStateFlow()
 
+    private val _bondedDevices = MutableStateFlow<List<BluetoothDevice>>(emptyList())
+    val bondedDevices: StateFlow<List<BluetoothDevice>> = _bondedDevices.asStateFlow()
+
     private val callback = object : BluetoothHidDevice.Callback() {
         override fun onConnectionStateChanged(device: BluetoothDevice?, state: Int) {
             super.onConnectionStateChanged(device, state)
-            when (state) {
-                BluetoothProfile.STATE_CONNECTED -> {
-                    connectedHostDevice = device
-                    val deviceName = try { device?.name } catch (_: SecurityException) { null } ?: device?.address ?: "Unknown"
-                    _connectionState.value = BluetoothHidConnectionState.Connected(deviceName = deviceName)
-                    _lastError.value = null
-                    Log.i(TAG, "Bluetooth HID Connected to: $deviceName")
-                }
-                BluetoothProfile.STATE_CONNECTING -> {
-                    _connectionState.value = BluetoothHidConnectionState.Connecting
-                }
-                BluetoothProfile.STATE_DISCONNECTED -> {
-                    if (connectedHostDevice == device) {
-                        connectedHostDevice = null
+            scope.launch {
+                when (state) {
+                    BluetoothProfile.STATE_CONNECTED -> {
+                        connectedHostDevice = device
+                        val devName = try { device?.name } catch (_: SecurityException) { null } ?: device?.address ?: "Connected Host"
+                        _connectionState.value = BluetoothHidConnectionState.Connected(deviceName = devName)
+                        _lastError.value = null
+                        Log.i(TAG, "Bluetooth HID Connected to: $devName")
                     }
-                    _connectionState.value = BluetoothHidConnectionState.Disconnected
-                    Log.i(TAG, "Bluetooth HID Disconnected")
+                    BluetoothProfile.STATE_CONNECTING -> {
+                        _connectionState.value = BluetoothHidConnectionState.Connecting
+                    }
+                    BluetoothProfile.STATE_DISCONNECTED -> {
+                        if (connectedHostDevice == device) {
+                            connectedHostDevice = null
+                        }
+                        _connectionState.value = BluetoothHidConnectionState.Disconnected
+                        Log.i(TAG, "Bluetooth HID Disconnected from device")
+                    }
                 }
             }
         }
 
         override fun onAppStatusChanged(pluggedDevice: BluetoothDevice?, registered: Boolean) {
             super.onAppStatusChanged(pluggedDevice, registered)
-            isRegistered = registered
-            Log.i(TAG, "Bluetooth HID App registration: registered=$registered")
-            if (registered) {
-                _lastError.value = null
-            } else {
-                _connectionState.value = BluetoothHidConnectionState.Disconnected
+            scope.launch {
+                isRegistered = registered
+                Log.i(TAG, "Bluetooth HID App registration status: registered=$registered")
+                if (registered) {
+                    _lastError.value = null
+                    refreshBondedDevices()
+                } else {
+                    _connectionState.value = BluetoothHidConnectionState.Disconnected
+                }
             }
         }
     }
@@ -162,6 +168,7 @@ class BluetoothHidInputBackend(private val context: Context) : InputBackend {
         override fun onServiceConnected(profile: Int, proxy: BluetoothProfile?) {
             if (profile == BluetoothProfile.HID_DEVICE) {
                 hidDevice = proxy as? BluetoothHidDevice
+                Log.i(TAG, "BluetoothProfile.HID_DEVICE connected proxy")
                 registerHidApp()
             }
         }
@@ -189,114 +196,136 @@ class BluetoothHidInputBackend(private val context: Context) : InputBackend {
         return manager?.adapter
     }
 
+    fun refreshBondedDevices() {
+        if (!hasBluetoothPermissions()) return
+        try {
+            val adapter = getAdapter() ?: return
+            _bondedDevices.value = adapter.bondedDevices.toList()
+        } catch (e: SecurityException) {
+            Log.w(TAG, "Cannot read bonded devices", e)
+        }
+    }
+
     override suspend fun initialize(): Result<Unit> {
         if (!hasBluetoothPermissions()) {
-            val msg = "Bluetooth permissions not granted. Tap to request."
+            val msg = "Grant Bluetooth permissions in Settings to enable Bluetooth HID"
             _lastError.value = msg
             return Result.failure(SecurityException(msg))
         }
 
         val adapter = getAdapter()
         if (adapter == null) {
-            _lastError.value = "Bluetooth hardware not available"
+            _lastError.value = "Bluetooth not supported on this device"
             return Result.failure(IllegalStateException("No Bluetooth"))
         }
 
         if (!adapter.isEnabled) {
-            _lastError.value = "Bluetooth is OFF. Enable it in Quick Settings."
+            _lastError.value = "Bluetooth is turned OFF"
             return Result.failure(IllegalStateException("Bluetooth disabled"))
         }
 
         _lastError.value = null
 
-        // Set adapter name to "MiniDex" so the host sees this name during pairing
-        try {
-            val currentName = adapter.name
-            if (currentName != BT_DEVICE_NAME) {
-                originalAdapterName = currentName
-                adapter.name = BT_DEVICE_NAME
-                Log.i(TAG, "Bluetooth adapter name → '$BT_DEVICE_NAME' (was: '$currentName')")
-            }
-        } catch (e: SecurityException) {
-            Log.w(TAG, "Cannot rename Bluetooth adapter (missing permission)", e)
-        }
-
-        // Connect to the HID Device Bluetooth profile
+        // Connect proxy if not already connected
         if (hidDevice == null) {
             try {
                 adapter.getProfileProxy(context, serviceListener, BluetoothProfile.HID_DEVICE)
             } catch (e: Exception) {
-                _lastError.value = "Failed to access Bluetooth HID profile: ${e.message}"
+                _lastError.value = "Failed to obtain HID profile: ${e.message}"
                 return Result.failure(e)
             }
+        } else if (!isRegistered) {
+            registerHidApp()
         }
 
+        refreshBondedDevices()
         return Result.success(Unit)
     }
 
-    private fun registerHidApp() {
+    fun registerHidApp() {
         val hid = hidDevice ?: return
         try {
             val sdp = BluetoothHidDeviceAppSdpSettings(
-                "MiniDex",
-                "Galaxy Z Flip7 DeX Keyboard & Touchpad",
-                "MiniDex",
+                BT_DEVICE_NAME,
+                "MiniDex Cover Screen Keyboard & Trackpad",
+                "RimorCosmicam",
                 BluetoothHidDevice.SUBCLASS1_COMBO,
                 HID_REPORT_DESCRIPTOR
             )
-            val registered = hid.registerApp(sdp, null, null, executor, callback)
-            if (registered) {
+            val ok = hid.registerApp(sdp, null, null, executor, callback)
+            if (ok) {
                 _lastError.value = null
-                Log.i(TAG, "HID app registered. Ready for pairing.")
+                Log.i(TAG, "registerApp submitted successfully for '$BT_DEVICE_NAME'")
             } else {
-                _lastError.value = "HID registration failed. Close other BT keyboard apps and retry."
-                Log.e(TAG, "registerApp() returned false")
+                _lastError.value = "HID registration busy. Retry in a moment."
+                Log.w(TAG, "registerApp returned false")
             }
         } catch (e: SecurityException) {
             _lastError.value = "Bluetooth permission denied."
-            Log.e(TAG, "SecurityException in registerApp", e)
+            Log.e(TAG, "registerApp SecurityException", e)
         } catch (e: Exception) {
-            _lastError.value = "HID registration error: ${e.message}"
-            Log.e(TAG, "Exception in registerApp", e)
+            _lastError.value = "HID error: ${e.message}"
+            Log.e(TAG, "registerApp Exception", e)
         }
     }
 
     /**
-     * Make the phone discoverable so the DeX host can find "MiniDex" in its Bluetooth scanner.
-     * Returns an Intent that the Activity should launch with startActivity().
+     * Connect directly to an already paired Bluetooth host.
      */
-    fun createDiscoverableIntent(): Intent {
-        return Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE).apply {
-            putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, DISCOVERABLE_DURATION)
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+    fun connectToDevice(device: BluetoothDevice) {
+        val hid = hidDevice
+        if (hid == null) {
+            _lastError.value = "HID device service not ready. Tap Start BT first."
+            return
+        }
+        try {
+            _connectionState.value = BluetoothHidConnectionState.Connecting
+            val ok = hid.connect(device)
+            if (!ok) {
+                _lastError.value = "Failed to initiate connection to ${device.name ?: device.address}"
+                _connectionState.value = BluetoothHidConnectionState.Disconnected
+            }
+        } catch (e: SecurityException) {
+            _lastError.value = "Permission denied connecting to device"
         }
     }
 
     /**
-     * Start the pairing flow: ensure HID is registered, then make discoverable.
-     * Returns the intent the Activity should launch to prompt discoverability.
+     * Prepares device for Bluetooth pairing and returns the discoverable Intent.
      */
     fun startPairing(): Intent? {
         if (!hasBluetoothPermissions()) {
-            _lastError.value = "Bluetooth permissions required first."
+            _lastError.value = "Bluetooth permission required"
             return null
         }
 
         val adapter = getAdapter()
         if (adapter == null || !adapter.isEnabled) {
-            _lastError.value = "Enable Bluetooth first."
+            _lastError.value = "Enable Bluetooth first"
             return null
         }
 
-        // Make sure HID app is registered
-        if (!isRegistered && hidDevice != null) {
+        // Set device name so other devices clearly see MiniDex
+        try {
+            adapter.name = BT_DEVICE_NAME
+        } catch (e: SecurityException) {
+            Log.w(TAG, "Cannot rename adapter", e)
+        }
+
+        // Ensure HID proxy and app registration are triggered
+        if (hidDevice == null) {
+            adapter.getProfileProxy(context, serviceListener, BluetoothProfile.HID_DEVICE)
+        } else if (!isRegistered) {
             registerHidApp()
         }
 
-        _lastError.value = null
         _connectionState.value = BluetoothHidConnectionState.Discoverable
+        _lastError.value = null
 
-        return createDiscoverableIntent()
+        return Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE).apply {
+            putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, DISCOVERABLE_DURATION)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
     }
 
     override fun sendKeyDown(keyCode: Int, metaState: Int, displayId: Int): Boolean {
@@ -368,11 +397,8 @@ class BluetoothHidInputBackend(private val context: Context) : InputBackend {
         report[2] = key
         return try {
             hid.sendReport(device, REPORT_ID_KEYBOARD, report)
-        } catch (e: SecurityException) {
-            Log.e(TAG, "SecurityException sending keyboard report", e)
-            false
         } catch (e: Exception) {
-            Log.e(TAG, "Error sending keyboard report", e)
+            Log.e(TAG, "Error sending keyboard report: ${e.message}")
             false
         }
     }
@@ -387,11 +413,8 @@ class BluetoothHidInputBackend(private val context: Context) : InputBackend {
         report[3] = wheel
         return try {
             hid.sendReport(device, REPORT_ID_MOUSE, report)
-        } catch (e: SecurityException) {
-            Log.e(TAG, "SecurityException sending mouse report", e)
-            false
         } catch (e: Exception) {
-            Log.e(TAG, "Error sending mouse report", e)
+            Log.e(TAG, "Error sending mouse report: ${e.message}")
             false
         }
     }
@@ -402,166 +425,11 @@ class BluetoothHidInputBackend(private val context: Context) : InputBackend {
             try { hid.unregisterApp() } catch (_: Exception) {}
         }
         isRegistered = false
-
-        // Restore original adapter name
-        if (originalAdapterName != null) {
-            try { getAdapter()?.name = originalAdapterName } catch (_: SecurityException) {}
-            originalAdapterName = null
-        }
-
         try {
             getAdapter()?.closeProfileProxy(BluetoothProfile.HID_DEVICE, hidDevice)
         } catch (_: Exception) {}
         hidDevice = null
         connectedHostDevice = null
         _connectionState.value = BluetoothHidConnectionState.Disconnected
-    }
-}
-
-sealed class BluetoothHidConnectionState {
-    data object Disconnected : BluetoothHidConnectionState()
-    data object Discoverable : BluetoothHidConnectionState()
-    data object Connecting : BluetoothHidConnectionState()
-    data class Connected(val deviceName: String) : BluetoothHidConnectionState()
-}
-
-/**
- * Standard HID Keycode translation table.
- */
-object HidKeyMap {
-    fun toHidModifier(metaState: Int): Byte {
-        var mod = 0
-        if ((metaState and android.view.KeyEvent.META_CTRL_ON) != 0) mod = mod or 0x01
-        if ((metaState and android.view.KeyEvent.META_SHIFT_ON) != 0) mod = mod or 0x02
-        if ((metaState and android.view.KeyEvent.META_ALT_ON) != 0) mod = mod or 0x04
-        if ((metaState and android.view.KeyEvent.META_META_ON) != 0) mod = mod or 0x08
-        return mod.toByte()
-    }
-
-    fun toHidUsage(keyCode: Int): Byte {
-        return when (keyCode) {
-            android.view.KeyEvent.KEYCODE_A -> 0x04
-            android.view.KeyEvent.KEYCODE_B -> 0x05
-            android.view.KeyEvent.KEYCODE_C -> 0x06
-            android.view.KeyEvent.KEYCODE_D -> 0x07
-            android.view.KeyEvent.KEYCODE_E -> 0x08
-            android.view.KeyEvent.KEYCODE_F -> 0x09
-            android.view.KeyEvent.KEYCODE_G -> 0x0A
-            android.view.KeyEvent.KEYCODE_H -> 0x0B
-            android.view.KeyEvent.KEYCODE_I -> 0x0C
-            android.view.KeyEvent.KEYCODE_J -> 0x0D
-            android.view.KeyEvent.KEYCODE_K -> 0x0E
-            android.view.KeyEvent.KEYCODE_L -> 0x0F
-            android.view.KeyEvent.KEYCODE_M -> 0x10
-            android.view.KeyEvent.KEYCODE_N -> 0x11
-            android.view.KeyEvent.KEYCODE_O -> 0x12
-            android.view.KeyEvent.KEYCODE_P -> 0x13
-            android.view.KeyEvent.KEYCODE_Q -> 0x14
-            android.view.KeyEvent.KEYCODE_R -> 0x15
-            android.view.KeyEvent.KEYCODE_S -> 0x16
-            android.view.KeyEvent.KEYCODE_T -> 0x17
-            android.view.KeyEvent.KEYCODE_U -> 0x18
-            android.view.KeyEvent.KEYCODE_V -> 0x19
-            android.view.KeyEvent.KEYCODE_W -> 0x1A
-            android.view.KeyEvent.KEYCODE_X -> 0x1B
-            android.view.KeyEvent.KEYCODE_Y -> 0x1C
-            android.view.KeyEvent.KEYCODE_Z -> 0x1D
-            android.view.KeyEvent.KEYCODE_1 -> 0x1E
-            android.view.KeyEvent.KEYCODE_2 -> 0x1F
-            android.view.KeyEvent.KEYCODE_3 -> 0x20
-            android.view.KeyEvent.KEYCODE_4 -> 0x21
-            android.view.KeyEvent.KEYCODE_5 -> 0x22
-            android.view.KeyEvent.KEYCODE_6 -> 0x23
-            android.view.KeyEvent.KEYCODE_7 -> 0x24
-            android.view.KeyEvent.KEYCODE_8 -> 0x25
-            android.view.KeyEvent.KEYCODE_9 -> 0x26
-            android.view.KeyEvent.KEYCODE_0 -> 0x27
-            android.view.KeyEvent.KEYCODE_ENTER -> 0x28
-            android.view.KeyEvent.KEYCODE_ESCAPE -> 0x29
-            android.view.KeyEvent.KEYCODE_DEL -> 0x2A
-            android.view.KeyEvent.KEYCODE_TAB -> 0x2B
-            android.view.KeyEvent.KEYCODE_SPACE -> 0x2C
-            android.view.KeyEvent.KEYCODE_MINUS -> 0x2D
-            android.view.KeyEvent.KEYCODE_EQUALS -> 0x2E
-            android.view.KeyEvent.KEYCODE_LEFT_BRACKET -> 0x2F
-            android.view.KeyEvent.KEYCODE_RIGHT_BRACKET -> 0x30
-            android.view.KeyEvent.KEYCODE_BACKSLASH -> 0x31
-            android.view.KeyEvent.KEYCODE_SEMICOLON -> 0x33
-            android.view.KeyEvent.KEYCODE_APOSTROPHE -> 0x34
-            android.view.KeyEvent.KEYCODE_GRAVE -> 0x35
-            android.view.KeyEvent.KEYCODE_COMMA -> 0x36
-            android.view.KeyEvent.KEYCODE_PERIOD -> 0x37
-            android.view.KeyEvent.KEYCODE_SLASH -> 0x38
-            android.view.KeyEvent.KEYCODE_CAPS_LOCK -> 0x39
-            android.view.KeyEvent.KEYCODE_F1 -> 0x3A
-            android.view.KeyEvent.KEYCODE_F2 -> 0x3B
-            android.view.KeyEvent.KEYCODE_F3 -> 0x3C
-            android.view.KeyEvent.KEYCODE_F4 -> 0x3D
-            android.view.KeyEvent.KEYCODE_F5 -> 0x3E
-            android.view.KeyEvent.KEYCODE_F6 -> 0x3F
-            android.view.KeyEvent.KEYCODE_F7 -> 0x40
-            android.view.KeyEvent.KEYCODE_F8 -> 0x41
-            android.view.KeyEvent.KEYCODE_F9 -> 0x42
-            android.view.KeyEvent.KEYCODE_F10 -> 0x43
-            android.view.KeyEvent.KEYCODE_F11 -> 0x44
-            android.view.KeyEvent.KEYCODE_F12 -> 0x45
-            android.view.KeyEvent.KEYCODE_SYSRQ -> 0x46
-            android.view.KeyEvent.KEYCODE_INSERT -> 0x49
-            android.view.KeyEvent.KEYCODE_MOVE_HOME -> 0x4A
-            android.view.KeyEvent.KEYCODE_PAGE_UP -> 0x4B
-            android.view.KeyEvent.KEYCODE_FORWARD_DEL -> 0x4C
-            android.view.KeyEvent.KEYCODE_MOVE_END -> 0x4D
-            android.view.KeyEvent.KEYCODE_PAGE_DOWN -> 0x4E
-            android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> 0x4F
-            android.view.KeyEvent.KEYCODE_DPAD_LEFT -> 0x50
-            android.view.KeyEvent.KEYCODE_DPAD_DOWN -> 0x51
-            android.view.KeyEvent.KEYCODE_DPAD_UP -> 0x52
-            else -> 0x00
-        }.toByte()
-    }
-
-    fun charToHid(char: Char): Pair<Byte, Boolean> {
-        return when (char) {
-            in 'a'..'z' -> Pair((0x04 + (char - 'a')).toByte(), false)
-            in 'A'..'Z' -> Pair((0x04 + (char - 'A')).toByte(), true)
-            in '1'..'9' -> Pair((0x1E + (char - '1')).toByte(), false)
-            '0' -> Pair(0x27.toByte(), false)
-            ' ' -> Pair(0x2C.toByte(), false)
-            '\n' -> Pair(0x28.toByte(), false)
-            '\t' -> Pair(0x2B.toByte(), false)
-            '!' -> Pair(0x1E.toByte(), true)
-            '@' -> Pair(0x1F.toByte(), true)
-            '#' -> Pair(0x20.toByte(), true)
-            '$' -> Pair(0x21.toByte(), true)
-            '%' -> Pair(0x22.toByte(), true)
-            '^' -> Pair(0x23.toByte(), true)
-            '&' -> Pair(0x24.toByte(), true)
-            '*' -> Pair(0x25.toByte(), true)
-            '(' -> Pair(0x26.toByte(), true)
-            ')' -> Pair(0x27.toByte(), true)
-            '-' -> Pair(0x2D.toByte(), false)
-            '_' -> Pair(0x2D.toByte(), true)
-            '=' -> Pair(0x2E.toByte(), false)
-            '+' -> Pair(0x2E.toByte(), true)
-            '[' -> Pair(0x2F.toByte(), false)
-            '{' -> Pair(0x2F.toByte(), true)
-            ']' -> Pair(0x30.toByte(), false)
-            '}' -> Pair(0x30.toByte(), true)
-            '\\' -> Pair(0x31.toByte(), false)
-            '|' -> Pair(0x31.toByte(), true)
-            ';' -> Pair(0x33.toByte(), false)
-            ':' -> Pair(0x33.toByte(), true)
-            '\'' -> Pair(0x34.toByte(), false)
-            '"' -> Pair(0x34.toByte(), true)
-            '`' -> Pair(0x35.toByte(), false)
-            '~' -> Pair(0x35.toByte(), true)
-            ',' -> Pair(0x36.toByte(), false)
-            '<' -> Pair(0x36.toByte(), true)
-            '.' -> Pair(0x37.toByte(), false)
-            '>' -> Pair(0x37.toByte(), true)
-            '/' -> Pair(0x38.toByte(), false)
-            '?' -> Pair(0x38.toByte(), true)
-            else -> Pair(0.toByte(), false)
-        }
     }
 }

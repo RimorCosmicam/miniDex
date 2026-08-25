@@ -53,6 +53,7 @@ fun MainScreen(viewModel: MainViewModel) {
     val isBluetoothHidReady by viewModel.isBluetoothHidReady.collectAsState()
     val bluetoothConnectionState by viewModel.backendManager.bluetoothHidBackend.connectionState.collectAsState()
     val bluetoothError by viewModel.backendManager.bluetoothHidBackend.lastError.collectAsState()
+    val bondedDevices by viewModel.bondedDevices.collectAsState()
     val showMacroEditor by viewModel.showMacroEditor.collectAsState()
 
     MiniDexTheme(
@@ -180,6 +181,7 @@ fun MainScreen(viewModel: MainViewModel) {
                                                 activeBackendName = activeBackend.name,
                                                 bluetoothConnectionState = bluetoothConnectionState,
                                                 bluetoothError = bluetoothError,
+                                                bondedDevices = bondedDevices,
                                                 onOpenAccessibilitySettings = { viewModel.openAccessibilitySettings() },
                                                 onStartBluetoothPairing = {
                                                     val intent = viewModel.startBluetoothPairing()
@@ -187,6 +189,7 @@ fun MainScreen(viewModel: MainViewModel) {
                                                         settingsContext.startActivity(intent)
                                                     }
                                                 },
+                                                onConnectToBluetoothDevice = { viewModel.connectToBluetoothDevice(it) },
                                                 onOpenBluetoothSettings = { viewModel.openBluetoothSettings() },
                                                 onUpdatePreferences = { viewModel.updatePreferences(it) }
                                             )

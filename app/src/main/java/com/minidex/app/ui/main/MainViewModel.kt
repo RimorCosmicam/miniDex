@@ -44,6 +44,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val activeBackend: StateFlow<InputBackend> = backendManager.activeBackend
     val isAccessibilityEnabled: StateFlow<Boolean> = backendManager.isAccessibilityEnabled
     val isBluetoothHidReady: StateFlow<Boolean> = backendManager.isBluetoothHidReady
+    val bondedDevices = backendManager.bluetoothHidBackend.bondedDevices
 
     private val _currentMode = MutableStateFlow(AppMode.KEYBOARD)
     val currentMode: StateFlow<AppMode> = _currentMode.asStateFlow()
@@ -199,6 +200,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun startBluetoothPairing(): Intent? {
         return backendManager.startBluetoothPairing()
+    }
+
+    fun connectToBluetoothDevice(device: android.bluetooth.BluetoothDevice) {
+        backendManager.connectToBluetoothDevice(device)
     }
 
     fun openBluetoothSettings() {

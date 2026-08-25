@@ -1,6 +1,7 @@
 package com.minidex.app.input
 
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.bluetooth.BluetoothDevice
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
@@ -24,12 +25,12 @@ class InputBackendManager(
         private const val TAG = "InputBackendManager"
     }
 
-    val bluetoothHidBackend = BluetoothHidInputBackend(context)
+    val bluetoothHidBackend = BluetoothHidInputBackend(context, scope)
     val accessibilityBackend = AccessibilityInputBackend(context)
     val virtualDeviceBackend = VirtualDeviceInputBackend(context)
     val fallbackBackend = FallbackInputBackend()
 
-    private val _activeBackend = MutableStateFlow<InputBackend>(fallbackBackend)
+    private val _activeBackend = MutableStateFlow<InputBackend>(accessibilityBackend)
     val activeBackend: StateFlow<InputBackend> = _activeBackend.asStateFlow()
 
     private val _isAccessibilityEnabled = MutableStateFlow(false)
@@ -42,6 +43,7 @@ class InputBackendManager(
 
     init {
         scope.launch {
+            bluetoothHidBackend.initialize()
             refreshBackend()
 
             // Heartbeat: detect when user toggles Accessibility or Bluetooth in Settings
@@ -68,12 +70,12 @@ class InputBackendManager(
         }
     }
 
-    /**
-     * Starts the Bluetooth HID pairing flow.
-     * Returns an Intent to launch (ACTION_REQUEST_DISCOVERABLE), or null if BT isn't ready.
-     */
     fun startBluetoothPairing(): Intent? {
         return bluetoothHidBackend.startPairing()
+    }
+
+    fun connectToBluetoothDevice(device: BluetoothDevice) {
+        bluetoothHidBackend.connectToDevice(device)
     }
 
     fun openBluetoothSettings() {
