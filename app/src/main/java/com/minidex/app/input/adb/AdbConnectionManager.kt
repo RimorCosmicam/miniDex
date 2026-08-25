@@ -413,13 +413,29 @@ class AdbConnectionManager(
         }
     }
 
-    fun sendDisplayTap(displayId: Int, x: Float, y: Float): Boolean = synchronized(hidLock) {
+    fun sendDisplayClick(
+        displayId: Int,
+        x: Float,
+        y: Float,
+        button: Int
+    ): Boolean = synchronized(hidLock) {
         val service = mouseService ?: return@synchronized false
         runCatching {
             check(service.isReady)
-            service.tap(displayId, x, y)
+            service.click(displayId, x, y, button)
         }.getOrElse {
-            Log.e(TAG, "Privileged display-targeted tap failed", it)
+            Log.e(TAG, "Privileged display-targeted click failed", it)
+            false
+        }
+    }
+
+    fun sendDisplayKey(displayId: Int, keyCode: Int): Boolean = synchronized(hidLock) {
+        val service = mouseService ?: return@synchronized false
+        runCatching {
+            check(service.isReady)
+            service.keyPress(displayId, keyCode)
+        }.getOrElse {
+            Log.e(TAG, "Privileged display-targeted key failed", it)
             false
         }
     }

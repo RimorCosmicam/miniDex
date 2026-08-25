@@ -161,8 +161,14 @@ class AdbInputBackend(
     override fun sendPointerClick(button: Int, displayId: Int): Boolean {
         if (!isAvailable) return false
         adbManager.guardNextLaunchOnDisplay(displayId)
-        if (button == 1 && adbManager.sendDisplayTap(displayId, cursorX, cursorY)) {
+        if ((button == 1 || button == 2) &&
+            adbManager.sendDisplayClick(displayId, cursorX, cursorY, button)
+        ) {
             return true
+        }
+        if (button == 4) {
+            return adbManager.sendDisplayKey(displayId, KeyEvent.KEYCODE_BACK) ||
+                sendKeyPress(KeyEvent.KEYCODE_BACK, 0, displayId)
         }
         if (button == 1 && MiniDexAccessibilityService.instance?.dispatchClick(
                 cursorX,

@@ -10,6 +10,8 @@ import android.os.Handler
 import android.os.Process
 import android.util.Log
 import android.view.InputDevice
+import android.view.KeyCharacterMap
+import android.view.KeyEvent
 import android.view.MotionEvent
 
 /** Entry point launched by app_process as the ADB shell user. */
@@ -81,48 +83,118 @@ class PrivilegedMouseService private constructor() : IMouseControl.Stub() {
         }
     }
 
-    override fun tap(displayId: Int, x: Float, y: Float): Boolean {
+    private fun inputManagerAndInjector(): Pair<Any, java.lang.reflect.Method> {
+        val inputManagerClass = Class.forName("android.hardware.input.InputManager")
+        val inputManager = inputManagerClass.getDeclaredMethod("getInstance")
+            .apply { isAccessible = true }
+            .invoke(null)
+        val injectMethod = inputManagerClass.methods.firstOrNull { method ->
+            method.name == "injectInputEvent" && method.parameterCount == 2
+        } ?: error("InputManager.injectInputEvent unavailable")
+        return inputManager to injectMethod
+    }
+
+    override fun click(displayId: Int, x: Float, y: Float, button: Int): Boolean {
         if (!ready || displayId < 0) return false
         return runCatching {
-            val inputManagerClass = Class.forName("android.hardware.input.InputManager")
-            val inputManager = inputManagerClass.getDeclaredMethod("getInstance")
-                .apply { isAccessible = true }
-                .invoke(null)
-            val injectMethod = inputManagerClass.methods.firstOrNull { method ->
-                method.name == "injectInputEvent" && method.parameterCount == 2
-            } ?: error("InputManager.injectInputEvent unavailable")
+            val (inputManager, injectMethod) = inputManagerAndInjector()
             val setDisplayId = MotionEvent::class.java.getMethod(
                 "setDisplayId",
                 Int::class.javaPrimitiveType
             )
+            val setActionButton = MotionEvent::class.java.getMethod(
+                "setActionButton",
+                Int::class.javaPrimitiveType
+            )
+            val buttonState = if (button == 2) {
+                MotionEvent.BUTTON_SECONDARY
+            } else {
+                MotionEvent.BUTTON_PRIMARY
+            }
             val downTime = android.os.SystemClock.uptimeMillis()
+            val pointerProperties = arrayOf(
+                MotionEvent.PointerProperties().apply {
+                    id = 0
+                    toolType = MotionEvent.TOOL_TYPE_MOUSE
+                }
+            )
+            val pointerCoords = arrayOf(
+                MotionEvent.PointerCoords().apply {
+                    this.x = x
+                    this.y = y
+                    pressure = 1f
+                    size = 1f
+                }
+            )
 
-            fun inject(action: Int, eventTime: Long): Boolean {
+            fun inject(action: Int, state: Int, actionButton: Int = 0): Boolean {
                 val event = MotionEvent.obtain(
                     downTime,
-                    eventTime,
+                    android.os.SystemClock.uptimeMillis(),
                     action,
-                    x,
-                    y,
+                    1,
+                    pointerProperties,
+                    pointerCoords,
+                    0,
+                    state,
+                    1f,
+                    1f,
+                    0,
+                    0,
+                    InputDevice.SOURCE_MOUSE,
                     0
                 )
                 return try {
-                    event.source = InputDevice.SOURCE_TOUCHSCREEN
                     setDisplayId.invoke(event, displayId)
+                    if (actionButton != 0) setActionButton.invoke(event, actionButton)
                     injectMethod.invoke(inputManager, event, 2) as? Boolean ?: false
                 } finally {
                     event.recycle()
                 }
             }
 
-            val downInjected = inject(MotionEvent.ACTION_DOWN, downTime)
+            val downInjected = inject(MotionEvent.ACTION_DOWN, buttonState)
+            inject(MotionEvent.ACTION_BUTTON_PRESS, buttonState, buttonState)
             Thread.sleep(35L)
-            downInjected && inject(
-                MotionEvent.ACTION_UP,
-                android.os.SystemClock.uptimeMillis()
-            )
+            inject(MotionEvent.ACTION_BUTTON_RELEASE, 0, buttonState)
+            val upInjected = inject(MotionEvent.ACTION_UP, 0)
+            downInjected && upInjected
         }.getOrElse {
-            Log.e(TAG, "Could not inject tap on display $displayId", it)
+            Log.e(TAG, "Could not inject mouse button $button on display $displayId", it)
+            false
+        }
+    }
+
+    override fun keyPress(displayId: Int, keyCode: Int): Boolean {
+        if (!ready || displayId < 0) return false
+        return runCatching {
+            val (inputManager, injectMethod) = inputManagerAndInjector()
+            val setDisplayId = KeyEvent::class.java.getMethod(
+                "setDisplayId",
+                Int::class.javaPrimitiveType
+            )
+            val downTime = android.os.SystemClock.uptimeMillis()
+            fun inject(action: Int): Boolean {
+                val event = KeyEvent(
+                    downTime,
+                    android.os.SystemClock.uptimeMillis(),
+                    action,
+                    keyCode,
+                    0,
+                    0,
+                    KeyCharacterMap.VIRTUAL_KEYBOARD,
+                    0,
+                    0,
+                    InputDevice.SOURCE_KEYBOARD
+                )
+                setDisplayId.invoke(event, displayId)
+                return injectMethod.invoke(inputManager, event, 2) as? Boolean ?: false
+            }
+            val downInjected = inject(KeyEvent.ACTION_DOWN)
+            Thread.sleep(25L)
+            downInjected && inject(KeyEvent.ACTION_UP)
+        }.getOrElse {
+            Log.e(TAG, "Could not inject key $keyCode on display $displayId", it)
             false
         }
     }
@@ -177,11 +249,19 @@ class PrivilegedMouseService private constructor() : IMouseControl.Stub() {
                 task.baseIntent?.categories?.contains(Intent.CATEGORY_HOME) != true
         }
         val offenderIds = offenders.mapTo(HashSet()) { it.taskId }
+        val packagesAlreadyOnTarget = tasks
+            .filter { taskDisplayId(it) == targetDisplayId }
+            .mapNotNullTo(HashSet()) { it.topActivity?.packageName ?: it.baseActivity?.packageName }
         moveAttempts.keys.retainAll(offenderIds)
         offenders.forEach { task ->
             val attempt = (moveAttempts[task.taskId] ?: 0) + 1
             moveAttempts[task.taskId] = attempt
-            moveTaskToDisplay(task.taskId, targetDisplayId, attempt)
+            val packageName = task.topActivity?.packageName ?: task.baseActivity?.packageName
+            if (attempt >= 4 && packageName != null && packageName in packagesAlreadyOnTarget) {
+                removeTask(task.taskId)
+            } else {
+                moveTaskToDisplay(task, sourceDisplayId, targetDisplayId, attempt)
+            }
         }
     }
 
@@ -198,7 +278,7 @@ class PrivilegedMouseService private constructor() : IMouseControl.Stub() {
         return null
     }
 
-    private fun taskDisplayId(task: ActivityManager.RunningTaskInfo): Int =
+    private fun taskDisplayId(task: Any): Int =
         reflectedField(task, "displayId") as? Int ?: -1
 
     private fun activityTaskManagerService(): Any {
@@ -238,7 +318,48 @@ class PrivilegedMouseService private constructor() : IMouseControl.Stub() {
         return emptyList()
     }
 
-    private fun moveTaskToDisplay(taskId: Int, displayId: Int, attempt: Int): Boolean {
+    private fun getRootTaskInfos(displayId: Int): List<Any> {
+        try {
+            val service = activityTaskManagerService()
+            val methods = Class.forName("android.app.IActivityTaskManager")
+                .methods
+                .filter { it.name.startsWith("getAllRootTaskInfos") }
+                .sortedBy { it.parameterCount }
+            methods.forEach { method ->
+                val args = method.parameterTypes.map { type ->
+                    when (type) {
+                        Int::class.javaPrimitiveType -> displayId
+                        Boolean::class.javaPrimitiveType -> false
+                        else -> null
+                    }
+                }.toTypedArray()
+                val result = runCatching { method.invoke(service, *args) }.getOrNull()
+                if (result is List<*>) return result.filterNotNull()
+            }
+        } catch (error: Throwable) {
+            Log.w(TAG, "Could not read root tasks for display $displayId", error)
+        }
+        return emptyList()
+    }
+
+    private fun rootTaskIdFor(taskId: Int, displayId: Int): Int {
+        val root = getRootTaskInfos(displayId).firstOrNull { info ->
+            val rootId = reflectedField(info, "taskId") as? Int ?: -1
+            val childIds = reflectedField(info, "childTaskIds") as? IntArray
+            taskDisplayId(info) == displayId &&
+                (rootId == taskId || childIds?.contains(taskId) == true)
+        }
+        return root?.let { reflectedField(it, "taskId") as? Int } ?: taskId
+    }
+
+    private fun moveTaskToDisplay(
+        task: ActivityManager.RunningTaskInfo,
+        sourceDisplayId: Int,
+        displayId: Int,
+        attempt: Int
+    ): Boolean {
+        val taskId = task.taskId
+        val rootTaskId = rootTaskIdFor(taskId, sourceDisplayId)
         val movedByBinder = runCatching {
             val service = activityTaskManagerService()
             val method = Class.forName("android.app.IActivityTaskManager")
@@ -247,7 +368,7 @@ class PrivilegedMouseService private constructor() : IMouseControl.Stub() {
                     Int::class.javaPrimitiveType,
                     Int::class.javaPrimitiveType
                 )
-            method.invoke(service, taskId, displayId)
+            method.invoke(service, rootTaskId, displayId)
             true
         }.getOrElse {
             Log.w(TAG, "Binder task move failed for task $taskId", it)
@@ -258,13 +379,32 @@ class PrivilegedMouseService private constructor() : IMouseControl.Stub() {
         // place. Repeated sweeps verify the real display and escalate to its shell
         // display command when necessary.
         if (movedByBinder && attempt == 1) {
-            Log.i(TAG, "Requested task $taskId move to display $displayId")
+            Log.i(TAG, "Requested root $rootTaskId (task $taskId) move to display $displayId")
             return true
         }
 
+        if (attempt == 3) {
+            val component = task.topActivity?.flattenToShortString()
+            if (component != null) {
+                runCatching {
+                    Runtime.getRuntime().exec(
+                        arrayOf(
+                            "am",
+                            "start",
+                            "--display",
+                            displayId.toString(),
+                            "--activity-reorder-to-front",
+                            "-n",
+                            component
+                        )
+                    ).waitFor()
+                }
+            }
+        }
+
         val commands = listOf(
-            "am display move-stack $taskId $displayId",
-            "cmd activity display move-root-task $taskId $displayId"
+            "am display move-stack $rootTaskId $displayId",
+            "cmd activity display move-root-task $rootTaskId $displayId"
         )
         return commands.any { command ->
             runCatching {
@@ -274,6 +414,13 @@ class PrivilegedMouseService private constructor() : IMouseControl.Stub() {
             if (!moved) Log.e(TAG, "Could not move task $taskId to display $displayId")
         }
     }
+
+    private fun removeTask(taskId: Int): Boolean = runCatching {
+        val service = activityTaskManagerService()
+        val method = Class.forName("android.app.IActivityTaskManager")
+            .getMethod("removeTask", Int::class.javaPrimitiveType)
+        method.invoke(service, taskId) as? Boolean ?: true
+    }.getOrDefault(false)
 
     override fun destroy() {
         ready = false

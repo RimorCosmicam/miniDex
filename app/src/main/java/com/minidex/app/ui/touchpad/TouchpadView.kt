@@ -71,6 +71,8 @@ fun TouchpadView(
     var lastTapTime by remember { mutableLongStateOf(0L) }
     var totalMovedDistance by remember { mutableFloatStateOf(0f) }
     var pointerCount by remember { mutableIntStateOf(0) }
+    var maxPointerCount by remember { mutableIntStateOf(0) }
+    var multiTapHandled by remember { mutableStateOf(false) }
     var isDragging by remember { mutableStateOf(false) }
     var isEdgeScrolling by remember { mutableStateOf(false) }
     var touchpadWidthPx by remember { mutableIntStateOf(0) }
@@ -106,6 +108,8 @@ fun TouchpadView(
                         lastTouchY = motionEvent.y
                         touchDownTime = now
                         totalMovedDistance = 0f
+                        maxPointerCount = 1
+                        multiTapHandled = false
                         isEdgeScrolling = if (userPreferences.edgeScrollOnRight) {
                             motionEvent.x >= touchpadWidthPx - edgeWidthPx
                         } else {
@@ -126,6 +130,7 @@ fun TouchpadView(
                     }
 
                     MotionEvent.ACTION_POINTER_DOWN -> {
+                        maxPointerCount = maxOf(maxPointerCount, motionEvent.pointerCount)
                         // Multi-touch started (e.g. 2 fingers)
                         if (motionEvent.pointerCount == 2) {
                             isEdgeScrolling = false
@@ -189,10 +194,16 @@ fun TouchpadView(
                     }
 
                     MotionEvent.ACTION_POINTER_UP -> {
-                        // Two finger tap detection (Right Click)
-                        if (motionEvent.pointerCount == 2 && totalMovedDistance < 20f && (now - touchDownTime) < 300L) {
-                            onPointerClick(2) // Right Click
-                            onHapticClick()
+                        if (!multiTapHandled && totalMovedDistance < 20f && (now - touchDownTime) < 350L) {
+                            if (maxPointerCount >= 3) {
+                                onPointerClick(4) // Three-finger tap: Back
+                                multiTapHandled = true
+                                onHapticClick()
+                            } else if (maxPointerCount == 2 && motionEvent.pointerCount == 2) {
+                                onPointerClick(2) // Two-finger tap: Right Click
+                                multiTapHandled = true
+                                onHapticClick()
+                            }
                         }
                         true
                     }
@@ -205,7 +216,13 @@ fun TouchpadView(
                             isDragging = false
                             onPointerUp(1) // Release drag
                             onHapticClick()
-                        } else if (totalMovedDistance < 15f && duration < 250L && userPreferences.tapToClick) {
+                        } else if (
+                            maxPointerCount == 1 &&
+                            !multiTapHandled &&
+                            totalMovedDistance < 15f &&
+                            duration < 250L &&
+                            userPreferences.tapToClick
+                        ) {
                             // Single Tap -> Left Click
                             val timeSinceLastTap = now - lastTapTime
                             if (timeSinceLastTap < 280L) {
@@ -312,7 +329,7 @@ fun TouchpadView(
 
         // Helper gestures hint
         Text(
-            text = "Edge: Scroll  •  1-Finger: Point/Tap  •  2-Finger: Scroll/Right-Click",
+            text = "Edge: Scroll  •  2-Finger: Scroll/Right-Click  •  3-Finger: Back",
             color = colors.textSecondary.copy(alpha = 0.3f),
             fontSize = 8.sp,
             fontWeight = FontWeight.Normal,
