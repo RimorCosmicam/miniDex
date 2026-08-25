@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Permissions for Input, Haptics, and Display monitoring -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.INTERACT_ACROSS_USERS" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.INJECT_EVENTS" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
+
+    <application
+        android:name=".MiniDexApplication"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.MiniDex"
+        tools:targetApi="35">
+
+        <!-- Samsung Galaxy Z Flip Cover Screen / FlexWindow compatibility metadata -->
+        <meta-data
+            android:name="com.samsung.android.multidisplay.keep_process_alive"
+            android:value="true" />
+        <meta-data
+            android:name="com.samsung.android.activity.showWhenLocked"
+            android:value="true" />
+        <meta-data
+            android:name="com.samsung.android.coverscreen.subscreen_compatible"
+            android:value="true" />
+
+        <activity
+            android:name=".ui.main.MainCoverActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:resizeableActivity="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|density|keyboardHidden"
+            android:windowSoftInputMode="adjustNothing"
+            android:theme="@style/Theme.MiniDex">
+            
+            <!-- Standard Android Launcher -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Samsung Good Lock / MultiStar FlexWindow Cover Screen Launcher Intent Filter -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="com.samsung.android.support.COVER_SCREEN" />
+            </intent-filter>
+
+            <!-- Samsung Cover Screen Direct Action -->
+            <intent-filter>
+                <action android:name="com.samsung.android.launcher.action.ENTER_COVER_SCREEN_APP" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Shizuku API Provider -->
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:multiprocess="false"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+
+    </application>
+
+</manifest>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MiniDex</string>
+    <string name="mode_keyboard">Keyboard</string>
+    <string name="mode_touchpad">Touchpad</string>
+    <string name="page_abc">ABC</string>
+    <string name="page_symbols">123</string>
+    <string name="page_nav">NAV</string>
+    <string name="page_macros">MACROS</string>
+    <string name="page_settings">SETTINGS</string>
+</resources>
