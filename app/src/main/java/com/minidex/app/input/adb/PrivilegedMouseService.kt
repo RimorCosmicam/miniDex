@@ -17,8 +17,16 @@ class PrivilegedMouseService private constructor() : IMouseControl.Stub() {
     private var nativeLibraryLoaded = false
     private var buttons = 0
     private val handler = Handler(Looper.getMainLooper())
-    private var launchGuardGeneration = 0
     private var appPackageName = ""
+    private var exclusiveTargetDisplayId = -1
+    private var flexViewDisplayId = -1
+    private val moveAttempts = HashMap<Int, Int>()
+    private val exclusiveSweep = object : Runnable {
+        override fun run() {
+            sweepFlexView()
+            if (ready && exclusiveTargetDisplayId >= 0) handler.postDelayed(this, 350L)
+        }
+    }
 
     private external fun nativeCreateMouse(): Boolean
     private external fun nativeSendReport(
@@ -72,29 +80,60 @@ class PrivilegedMouseService private constructor() : IMouseControl.Stub() {
     }
 
     override fun guardNextLaunch(displayId: Int) {
+        setExclusiveDisplay(displayId)
+    }
+
+    override fun setExclusiveDisplay(displayId: Int) {
         if (displayId < 0) return
-        val before = getRunningTasks()
-        val beforeIds = before.mapTo(HashSet()) { it.taskId }
-        val beforeFocusedId = before.firstOrNull(::taskIsFocused)?.taskId ?: -1
-        val generation = ++launchGuardGeneration
-        longArrayOf(250L, 600L, 1_100L).forEach { delayMs ->
-            handler.postDelayed({
-                if (generation != launchGuardGeneration) return@postDelayed
-                val tasks = getRunningTasks()
-                val candidate = tasks.firstOrNull { task ->
-                    taskDisplayId(task) != displayId &&
-                        task.topActivity?.packageName != appPackageName &&
-                        (task.taskId !in beforeIds ||
-                            (taskIsFocused(task) && task.taskId != beforeFocusedId))
-                }
-                if (candidate != null && moveTaskToDisplay(candidate.taskId, displayId)) {
-                    launchGuardGeneration++
-                    Log.i(
-                        TAG,
-                        "Moved task ${candidate.taskId} from display ${taskDisplayId(candidate)} to $displayId"
-                    )
-                }
-            }, delayMs)
+        if (exclusiveTargetDisplayId != displayId) {
+            exclusiveTargetDisplayId = displayId
+            flexViewDisplayId = -1
+            moveAttempts.clear()
+        }
+        handler.removeCallbacks(exclusiveSweep)
+        handler.post(exclusiveSweep)
+    }
+
+    private fun sweepFlexView() {
+        val targetDisplayId = exclusiveTargetDisplayId
+        if (targetDisplayId < 0) return
+        val tasks = getRunningTasks()
+        if (tasks.isEmpty()) return
+
+        val miniDexTask = tasks.firstOrNull { task ->
+            task.topActivity?.packageName == appPackageName ||
+                task.baseActivity?.packageName == appPackageName
+        }
+        val detectedFlexView = miniDexTask?.let(::taskDisplayId) ?: -1
+        if (detectedFlexView >= 0 && detectedFlexView != targetDisplayId) {
+            flexViewDisplayId = detectedFlexView
+        }
+        // FlexView is Samsung's physical/default display. Package-based detection
+        // is preferred, but display 0 is a safe fallback when DeX omits MiniDex
+        // from the running-task snapshot.
+        val sourceDisplayId = if (flexViewDisplayId >= 0) {
+            flexViewDisplayId
+        } else if (targetDisplayId != 0) {
+            0
+        } else {
+            -1
+        }
+        if (sourceDisplayId < 0 || sourceDisplayId == targetDisplayId) return
+
+        val offenders = tasks.filter { task ->
+            val packageName = task.topActivity?.packageName ?: task.baseActivity?.packageName
+            taskDisplayId(task) == sourceDisplayId &&
+                packageName != null &&
+                packageName != appPackageName &&
+                packageName != "com.android.systemui" &&
+                task.baseIntent?.categories?.contains(Intent.CATEGORY_HOME) != true
+        }
+        val offenderIds = offenders.mapTo(HashSet()) { it.taskId }
+        moveAttempts.keys.retainAll(offenderIds)
+        offenders.forEach { task ->
+            val attempt = (moveAttempts[task.taskId] ?: 0) + 1
+            moveAttempts[task.taskId] = attempt
+            moveTaskToDisplay(task.taskId, targetDisplayId, attempt)
         }
     }
 
@@ -114,9 +153,6 @@ class PrivilegedMouseService private constructor() : IMouseControl.Stub() {
     private fun taskDisplayId(task: ActivityManager.RunningTaskInfo): Int =
         reflectedField(task, "displayId") as? Int ?: -1
 
-    private fun taskIsFocused(task: ActivityManager.RunningTaskInfo): Boolean =
-        reflectedField(task, "isFocused") as? Boolean ?: false
-
     private fun activityTaskManagerService(): Any {
         return Class.forName("android.app.ActivityTaskManager")
             .getDeclaredMethod("getService")
@@ -126,30 +162,36 @@ class PrivilegedMouseService private constructor() : IMouseControl.Stub() {
     private fun getRunningTasks(): List<ActivityManager.RunningTaskInfo> {
         return runCatching {
             val service = activityTaskManagerService()
-            val method = Class.forName("android.app.IActivityTaskManager")
+            val methods = Class.forName("android.app.IActivityTaskManager")
                 .methods
                 .filter { it.name == "getTasks" }
-                .maxByOrNull { it.parameterCount }
-                ?: return emptyList()
-            var integerIndex = 0
-            val args = method.parameterTypes.map { type ->
-                when (type) {
-                    Int::class.javaPrimitiveType -> {
-                        if (integerIndex++ == 0) 32 else -1
+                .sortedByDescending { it.parameterCount }
+            methods.forEach { method ->
+                var integerIndex = 0
+                val args = method.parameterTypes.map { type ->
+                    when (type) {
+                        Int::class.javaPrimitiveType -> {
+                            if (integerIndex++ == 0) 64 else -1
+                        }
+                        Boolean::class.javaPrimitiveType -> false
+                        String::class.java -> appPackageName
+                        else -> null
                     }
-                    Boolean::class.javaPrimitiveType -> false
-                    else -> null
+                }.toTypedArray()
+                val result = runCatching { method.invoke(service, *args) }.getOrNull()
+                @Suppress("UNCHECKED_CAST")
+                if (result is List<*>) {
+                    return result.filterIsInstance<ActivityManager.RunningTaskInfo>()
                 }
-            }.toTypedArray()
-            @Suppress("UNCHECKED_CAST")
-            method.invoke(service, *args) as? List<ActivityManager.RunningTaskInfo> ?: emptyList()
+            }
+            emptyList()
         }.getOrElse {
             Log.e(TAG, "Could not read running tasks", it)
             emptyList()
         }
     }
 
-    private fun moveTaskToDisplay(taskId: Int, displayId: Int): Boolean {
+    private fun moveTaskToDisplay(taskId: Int, displayId: Int, attempt: Int): Boolean {
         val movedByBinder = runCatching {
             val service = activityTaskManagerService()
             val method = Class.forName("android.app.IActivityTaskManager")
@@ -161,10 +203,17 @@ class PrivilegedMouseService private constructor() : IMouseControl.Stub() {
             method.invoke(service, taskId, displayId)
             true
         }.getOrElse {
-            Log.w(TAG, "Binder task move failed; trying shell command", it)
+            Log.w(TAG, "Binder task move failed for task $taskId", it)
             false
         }
-        if (movedByBinder) return true
+
+        // Samsung sometimes accepts the Binder call but leaves a freeform task in
+        // place. Repeated sweeps verify the real display and escalate to its shell
+        // display command when necessary.
+        if (movedByBinder && attempt == 1) {
+            Log.i(TAG, "Requested task $taskId move to display $displayId")
+            return true
+        }
 
         val commands = listOf(
             "am display move-stack $taskId $displayId",
@@ -181,6 +230,7 @@ class PrivilegedMouseService private constructor() : IMouseControl.Stub() {
 
     override fun destroy() {
         ready = false
+        handler.removeCallbacks(exclusiveSweep)
         mouseReady = false
         if (nativeLibraryLoaded) runCatching { nativeDestroyMouse() }
         Looper.getMainLooper().quitSafely()

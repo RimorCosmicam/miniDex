@@ -91,6 +91,7 @@ class AdbConnectionManager(
     @Volatile private var mouseService: IMouseControl? = null
     @Volatile private var binderWaiter: CompletableDeferred<IMouseControl>? = null
     @Volatile private var requestedCursorMode = CursorMode.AUTO_NATIVE
+    @Volatile private var exclusiveDisplayId = -1
 
     private val isConnecting = AtomicBoolean(false)
 
@@ -108,6 +109,10 @@ class AdbConnectionManager(
             } ?: return
             val service = IMouseControl.Stub.asInterface(container.binder) ?: return
             mouseService = service
+            if (exclusiveDisplayId >= 0) {
+                runCatching { service.setExclusiveDisplay(exclusiveDisplayId) }
+                    .onFailure { Log.e(TAG, "Could not start FlexView quarantine", it) }
+            }
             binderWaiter?.complete(service)
             Log.i(TAG, "Privileged UHID Binder received")
         }
@@ -405,6 +410,15 @@ class AdbConnectionManager(
         synchronized(hidLock) {
             runCatching { mouseService?.guardNextLaunch(displayId) }
                 .onFailure { Log.e(TAG, "Could not arm DeX launch guard", it) }
+        }
+    }
+
+    fun keepFlexViewExclusiveFor(displayId: Int) {
+        if (displayId < 0) return
+        exclusiveDisplayId = displayId
+        synchronized(hidLock) {
+            runCatching { mouseService?.setExclusiveDisplay(displayId) }
+                .onFailure { Log.e(TAG, "Could not update FlexView quarantine", it) }
         }
     }
 

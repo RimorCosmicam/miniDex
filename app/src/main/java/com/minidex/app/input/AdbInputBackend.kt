@@ -54,6 +54,9 @@ class AdbInputBackend(
 
     fun setDisplayBounds(displayId: Int, width: Int, height: Int) {
         if (width <= 0 || height <= 0) return
+        if (targetDisplayId != displayId) {
+            adbManager.keepFlexViewExclusiveFor(displayId)
+        }
         targetDisplayId = displayId
         displayWidth = width.toFloat()
         displayHeight = height.toFloat()

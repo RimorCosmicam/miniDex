@@ -6,5 +6,6 @@ interface IMouseControl {
     void setButton(int button, boolean pressed);
     void scroll(int vertical, int horizontal);
     void guardNextLaunch(int displayId);
+    void setExclusiveDisplay(int displayId);
     void destroy();
 }
