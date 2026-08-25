@@ -41,7 +41,7 @@ fun PageBar(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Wireless ADB Status Pill
+        // Wireless ADB status
         val adbShape = RoundedCornerShape(6.dp)
         Box(
             modifier = Modifier
@@ -61,7 +61,7 @@ fun PageBar(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = if (isAdbConnected) "⚡ADB" else "ADB",
+                text = if (isAdbConnected) "ADB ✓" else "ADB",
                 color = if (isAdbConnected) Color(0xFF00E676) else colors.textSecondary,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,

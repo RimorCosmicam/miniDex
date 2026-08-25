@@ -66,12 +66,12 @@ fun SettingsView(
         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Section: Wireless ADB Driver (Highest Performance)
+        // Section: Wireless debugging connection
         item {
-            SettingsGroup(title = "WIRELESS ADB (ZERO LATENCY)") {
+            SettingsGroup(title = "CONNECTION") {
                 SettingsClickableRow(
-                    label = "Wireless ADB Driver",
-                    status = if (isAdbConnected) "⚡ Connected" else "Pair Device ›",
+                    label = "Wireless debugging",
+                    status = if (isAdbConnected) "Connected" else "Pair device ›",
                     statusColor = if (isAdbConnected) Color(0xFF00E676) else colors.accent,
                     onClick = onOpenAdbPairing
                 )
@@ -104,8 +104,8 @@ fun SettingsView(
                 SettingsDivider()
 
                 SettingsRow(
-                    label = "Driver Status",
-                    value = if (isAdbConnected) "Active (Hardware Injection)" else adbStatusMessage.take(24),
+                    label = "Connection status",
+                    value = if (isAdbConnected) "Connected" else adbStatusMessage.take(24),
                     valueColor = if (isAdbConnected) Color(0xFF00E676) else colors.textSecondary
                 )
             }

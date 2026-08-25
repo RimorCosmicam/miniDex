@@ -23,7 +23,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Manages the multi-tier driver architecture for Samsung DeX control:
- * 1. Wireless ADB Driver — hardware-level input injection (zero-latency, full scancode scancodes & multi-display)
+ * 1. Wireless ADB — authenticated shell input and the privileged mouse service
  * 2. Accessibility Service — native gesture dispatch fallback (touchpad clicks, drags, scrolls)
  * 3. IME InputMethodService — text input integration
  * 4. Fallback backend — local simulation/test

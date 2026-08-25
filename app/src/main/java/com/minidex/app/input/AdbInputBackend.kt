@@ -6,11 +6,7 @@ import com.minidex.app.domain.model.CursorMode
 import com.minidex.app.input.adb.AdbConnectionManager
 import com.minidex.app.input.adb.AdbConnectionStatus
 
-/**
- * High-performance, hardware-level InputBackend leveraging Wireless ADB.
- * Dispatches key events, text, and relative mouse / trackpad gestures directly to
- * specific Samsung DeX displays via the native Android 'input' framework.
- */
+/** Sends keyboard and pointer input through an authenticated Wireless ADB connection. */
 class AdbInputBackend(
     val adbManager: AdbConnectionManager
 ) : InputBackend {
@@ -22,7 +18,7 @@ class AdbInputBackend(
     }
 
     override val id: String = "adb"
-    override val name: String = "Wireless ADB (Zero Latency)"
+    override val name: String = "Wireless ADB"
 
     override val isAvailable: Boolean
         get() = adbManager.status.value == AdbConnectionStatus.CONNECTED
