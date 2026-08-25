@@ -1,7 +1,6 @@
 package com.minidex.app.ui.main
 
 import android.app.Application
-import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.minidex.app.data.MacroRepository
@@ -43,8 +42,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val activeDexDisplay: StateFlow<DexDisplayInfo> = displayManager.activeDexDisplay
     val activeBackend: StateFlow<InputBackend> = backendManager.activeBackend
     val isAccessibilityEnabled: StateFlow<Boolean> = backendManager.isAccessibilityEnabled
-    val isBluetoothHidReady: StateFlow<Boolean> = backendManager.isBluetoothHidReady
-    val bondedDevices = backendManager.bluetoothHidBackend.bondedDevices
+    val isImeEnabled: StateFlow<Boolean> = backendManager.isImeEnabled
 
     private val _currentMode = MutableStateFlow(AppMode.KEYBOARD)
     val currentMode: StateFlow<AppMode> = _currentMode.asStateFlow()
@@ -204,18 +202,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun openImeSettings() {
         backendManager.openImeSettings()
-    }
-
-    fun startBluetoothPairing(): Intent? {
-        return backendManager.startBluetoothPairing()
-    }
-
-    fun connectToBluetoothDevice(device: android.bluetooth.BluetoothDevice) {
-        backendManager.connectToBluetoothDevice(device)
-    }
-
-    fun openBluetoothSettings() {
-        backendManager.openBluetoothSettings()
     }
 
     fun refreshBackend() {

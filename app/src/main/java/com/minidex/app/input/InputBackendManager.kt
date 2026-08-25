@@ -1,13 +1,13 @@
 package com.minidex.app.input
 
 import android.accessibilityservice.AccessibilityServiceInfo
-import android.bluetooth.BluetoothDevice
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import android.util.Log
 import android.view.accessibility.AccessibilityManager
 import com.minidex.app.input.accessibility.MiniDexAccessibilityService
+import com.minidex.app.input.ime.MiniDexInputMethodService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -17,6 +17,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
+/**
+ * Manages the two native same-device drivers for Samsung DeX control:
+ * 1. Accessibility Service — multi-display gesture dispatch (touchpad clicks, drags, scrolls)
+ * 2. IME InputMethodService — native keyboard text injection into DeX windows
+ *
+ * No Bluetooth. No Shizuku. No root. 100% native Android APIs running on the same Z Flip7.
+ */
 class InputBackendManager(
     private val context: Context,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Main)
@@ -25,9 +32,7 @@ class InputBackendManager(
         private const val TAG = "InputBackendManager"
     }
 
-    val bluetoothHidBackend = BluetoothHidInputBackend(context, scope)
     val accessibilityBackend = AccessibilityInputBackend(context)
-    val virtualDeviceBackend = VirtualDeviceInputBackend(context)
     val fallbackBackend = FallbackInputBackend()
 
     private val _activeBackend = MutableStateFlow<InputBackend>(accessibilityBackend)
@@ -36,27 +41,19 @@ class InputBackendManager(
     private val _isAccessibilityEnabled = MutableStateFlow(false)
     val isAccessibilityEnabled: StateFlow<Boolean> = _isAccessibilityEnabled.asStateFlow()
 
-    private val _isBluetoothHidReady = MutableStateFlow(false)
-    val isBluetoothHidReady: StateFlow<Boolean> = _isBluetoothHidReady.asStateFlow()
-
-    private var preferredBackendConfig: String = "AUTO"
+    private val _isImeEnabled = MutableStateFlow(false)
+    val isImeEnabled: StateFlow<Boolean> = _isImeEnabled.asStateFlow()
 
     init {
         scope.launch {
-            bluetoothHidBackend.initialize()
             refreshBackend()
 
-            // Heartbeat: detect when user toggles Accessibility or Bluetooth in Settings
+            // Heartbeat: detect when user toggles Accessibility or IME in Settings
             while (isActive) {
                 delay(1500)
                 refreshBackend()
             }
         }
-    }
-
-    fun setPreferredBackend(backendId: String) {
-        preferredBackendConfig = backendId
-        scope.launch { refreshBackend() }
     }
 
     fun openAccessibilitySettings() {
@@ -81,25 +78,6 @@ class InputBackendManager(
         }
     }
 
-    fun startBluetoothPairing(): Intent? {
-        return bluetoothHidBackend.startPairing()
-    }
-
-    fun connectToBluetoothDevice(device: BluetoothDevice) {
-        bluetoothHidBackend.connectToDevice(device)
-    }
-
-    fun openBluetoothSettings() {
-        try {
-            val intent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
-            context.startActivity(intent)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to open bluetooth settings", e)
-        }
-    }
-
     private fun checkAccessibilityServiceConfigured(): Boolean {
         if (MiniDexAccessibilityService.isServiceEnabled()) return true
 
@@ -113,30 +91,12 @@ class InputBackendManager(
     suspend fun refreshBackend() {
         val a11yActive = checkAccessibilityServiceConfigured()
         _isAccessibilityEnabled.value = a11yActive
+        _isImeEnabled.value = MiniDexInputMethodService.isImeActive()
 
-        val btConnected = bluetoothHidBackend.connectionState.value is BluetoothHidConnectionState.Connected
-        _isBluetoothHidReady.value = bluetoothHidBackend.isAvailable
-
-        val candidate: InputBackend = when (preferredBackendConfig) {
-            "BLUETOOTH_HID" -> {
-                if (btConnected) bluetoothHidBackend else fallbackBackend
-            }
-            "ACCESSIBILITY" -> {
-                if (a11yActive) accessibilityBackend else fallbackBackend
-            }
-            "VIRTUAL_DEVICE" -> {
-                if (virtualDeviceBackend.isAvailable) virtualDeviceBackend else fallbackBackend
-            }
-            "FALLBACK" -> fallbackBackend
-            else -> { // AUTO: prefer BT HID when connected, then Accessibility, then fallback
-                if (btConnected) {
-                    bluetoothHidBackend
-                } else if (a11yActive) {
-                    accessibilityBackend
-                } else {
-                    fallbackBackend
-                }
-            }
+        val candidate: InputBackend = if (a11yActive) {
+            accessibilityBackend
+        } else {
+            fallbackBackend
         }
 
         candidate.initialize()
@@ -144,9 +104,7 @@ class InputBackendManager(
     }
 
     fun release() {
-        bluetoothHidBackend.release()
         accessibilityBackend.release()
-        virtualDeviceBackend.release()
         fallbackBackend.release()
     }
 }

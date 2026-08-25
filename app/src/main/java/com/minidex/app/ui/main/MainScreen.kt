@@ -22,11 +22,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.minidex.app.domain.model.AppMode
 import com.minidex.app.domain.model.KeyboardPage
-import com.minidex.app.input.BluetoothHidConnectionState
 import com.minidex.app.ui.components.ModeSwitcherButton
 import com.minidex.app.ui.components.PageBar
 import com.minidex.app.ui.components.SpecialRow
