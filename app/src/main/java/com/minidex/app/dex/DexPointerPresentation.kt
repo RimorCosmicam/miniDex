@@ -11,8 +11,6 @@ import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
-import android.widget.ImageView
-import com.minidex.app.R
 
 /**
  * Overlay presentation rendered directly on the external DeX display.
@@ -25,7 +23,6 @@ class DexPointerPresentation(
 ) : Presentation(context, display) {
 
     private var cursorView: View? = null
-    private var rootLayout: FrameLayout? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,12 +45,12 @@ class DexPointerPresentation(
             setBackgroundDrawable(null)
         }
 
-        rootLayout = FrameLayout(context).apply {
+        val rootLayout = FrameLayout(context).apply {
             setBackgroundColor(Color.TRANSPARENT)
         }
 
         // Sleek cyber cursor dot with glowing ring
-        cursorView = View(context).apply {
+        val cursor = View(context).apply {
             val drawable = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
                 setColor(0xEE00E5FF.toInt())
@@ -67,7 +64,8 @@ class DexPointerPresentation(
             alpha = 0.9f
         }
 
-        rootLayout?.addView(cursorView)
+        cursorView = cursor
+        rootLayout.addView(cursor)
         setContentView(rootLayout)
     }
 
