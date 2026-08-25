@@ -42,7 +42,6 @@ class InputBackendManager(
 
     init {
         scope.launch {
-            bluetoothHidBackend.initialize()
             refreshBackend()
 
             // Heartbeat: detect when user toggles Accessibility or Bluetooth in Settings

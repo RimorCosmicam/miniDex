@@ -5,6 +5,7 @@ import android.hardware.display.DisplayManager
 import android.os.Handler
 import android.os.Looper
 import android.util.DisplayMetrics
+import android.util.Log
 import android.view.Display
 import com.minidex.app.domain.model.DexDisplayInfo
 import kotlinx.coroutines.CoroutineScope
@@ -15,12 +16,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * Discovers and tracks external Samsung DeX display connections and state changes.
+ * Discovers and tracks external Samsung DeX display connections and coordinates the visual pointer presentation.
  */
 class DexDisplayManager(
     private val context: Context,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Main)
 ) {
+    companion object {
+        private const val TAG = "DexDisplayManager"
+    }
 
     private val displayManager = context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
     private val _activeDexDisplay = MutableStateFlow(DexDisplayInfo.Disconnected)
@@ -30,6 +34,7 @@ class DexDisplayManager(
     val availableDisplays: StateFlow<List<DexDisplayInfo>> = _availableDisplays.asStateFlow()
 
     private var manualOverrideDisplayId: Int = -1
+    private var pointerPresentation: DexPointerPresentation? = null
 
     private val displayListener = object : DisplayManager.DisplayListener {
         override fun onDisplayAdded(displayId: Int) {
@@ -53,6 +58,32 @@ class DexDisplayManager(
     fun setManualOverride(displayId: Int) {
         manualOverrideDisplayId = displayId
         refreshDisplays()
+    }
+
+    fun updatePointerPosition(x: Float, y: Float) {
+        pointerPresentation?.updatePointerPosition(x, y)
+    }
+
+    private fun updatePresentation(activeDisplay: DexDisplayInfo) {
+        if (activeDisplay.isConnected && activeDisplay.isExternal) {
+            val display = displayManager.getDisplay(activeDisplay.displayId)
+            if (display != null && pointerPresentation?.display?.displayId != display.displayId) {
+                try {
+                    pointerPresentation?.dismiss()
+                    pointerPresentation = DexPointerPresentation(context, display).apply {
+                        show()
+                    }
+                    Log.i(TAG, "Attached pointer presentation to DeX display #${activeDisplay.displayId}")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not show pointer presentation overlay on display ${activeDisplay.displayId}: ${e.message}")
+                }
+            }
+        } else {
+            try {
+                pointerPresentation?.dismiss()
+                pointerPresentation = null
+            } catch (e: Exception) {}
+        }
     }
 
     fun refreshDisplays() {
@@ -92,7 +123,9 @@ class DexDisplayManager(
                 findBestDexCandidate(detectedList)
             }
 
-            _activeDexDisplay.value = selected ?: DexDisplayInfo.Disconnected
+            val result = selected ?: DexDisplayInfo.Disconnected
+            _activeDexDisplay.value = result
+            updatePresentation(result)
         }
     }
 
@@ -115,6 +148,10 @@ class DexDisplayManager(
     }
 
     fun release() {
+        try {
+            pointerPresentation?.dismiss()
+            pointerPresentation = null
+        } catch (e: Exception) {}
         displayManager.unregisterDisplayListener(displayListener)
     }
 }

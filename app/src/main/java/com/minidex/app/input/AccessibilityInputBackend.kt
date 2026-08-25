@@ -2,12 +2,11 @@ package com.minidex.app.input
 
 import android.content.Context
 import android.util.Log
-import android.view.KeyEvent
 import com.minidex.app.input.accessibility.MiniDexAccessibilityService
 
 /**
- * Stable, zero-disconnect input backend leveraging Android's AccessibilityService framework.
- * Dispatches clicks, drags, swipes, scrolls, and text actions directly to the focused DeX app window.
+ * Stable, zero-disconnect native input backend leveraging Android's Multi-Display Accessibility framework.
+ * Dispatches clicks, drags, swipes, scrolls, and text actions directly to the focused Samsung DeX display.
  */
 class AccessibilityInputBackend(private val context: Context) : InputBackend {
 
@@ -16,7 +15,7 @@ class AccessibilityInputBackend(private val context: Context) : InputBackend {
     }
 
     override val id: String = "ACCESSIBILITY"
-    override val name: String = "Native Accessibility (Zero Disconnects)"
+    override val name: String = "Native DeX Direct Driver"
     override val requiresPrivilegedAccess: Boolean = false
 
     override val isAvailable: Boolean
@@ -28,9 +27,11 @@ class AccessibilityInputBackend(private val context: Context) : InputBackend {
     private var dragStartX: Float = 0f
     private var dragStartY: Float = 0f
 
+    var onPointerUpdate: ((Float, Float) -> Unit)? = null
+
     override suspend fun initialize(): Result<Unit> {
         return if (isAvailable) {
-            Log.i(TAG, "AccessibilityInputBackend ready")
+            Log.i(TAG, "AccessibilityInputBackend ready for DeX injection")
             Result.success(Unit)
         } else {
             Result.failure(IllegalStateException("Accessibility Service not enabled in system Settings"))
@@ -62,11 +63,12 @@ class AccessibilityInputBackend(private val context: Context) : InputBackend {
 
         if (isDragging) {
             val service = MiniDexAccessibilityService.instance
-            service?.dispatchDrag(pointerX, pointerY, newX, newY, 50)
+            service?.dispatchDrag(pointerX, pointerY, newX, newY, displayId, 40)
         }
 
         pointerX = newX
         pointerY = newY
+        onPointerUpdate?.invoke(pointerX, pointerY)
         return true
     }
 
@@ -81,19 +83,19 @@ class AccessibilityInputBackend(private val context: Context) : InputBackend {
         if (isDragging) {
             isDragging = false
             val service = MiniDexAccessibilityService.instance
-            service?.dispatchDrag(dragStartX, dragStartY, pointerX, pointerY, 80)
+            service?.dispatchDrag(dragStartX, dragStartY, pointerX, pointerY, displayId, 60)
         }
         return true
     }
 
     override fun sendPointerClick(button: Int, displayId: Int): Boolean {
         val service = MiniDexAccessibilityService.instance ?: return false
-        return service.dispatchClick(pointerX, pointerY)
+        return service.dispatchClick(pointerX, pointerY, displayId)
     }
 
     override fun sendScroll(dx: Float, dy: Float, displayId: Int): Boolean {
         val service = MiniDexAccessibilityService.instance ?: return false
-        return service.dispatchScroll(pointerX, pointerY, dx * 10f, dy * 10f)
+        return service.dispatchScroll(pointerX, pointerY, dx * 10f, dy * 10f, displayId)
     }
 
     override fun release() {
