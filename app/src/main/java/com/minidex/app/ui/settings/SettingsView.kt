@@ -1,7 +1,5 @@
 package com.minidex.app.ui.settings
 
-import android.bluetooth.BluetoothDevice
-import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,7 +28,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.minidex.app.data.UserPreferences
@@ -40,7 +36,7 @@ import com.minidex.app.domain.model.DexDisplayInfo
 import com.minidex.app.domain.model.HapticStrength
 import com.minidex.app.domain.model.KeyHeightLevel
 import com.minidex.app.domain.model.ThemeVariant
-import com.minidex.app.input.BluetoothHidConnectionState
+import com.minidex.app.input.ime.MiniDexInputMethodService
 import com.minidex.app.ui.theme.LocalMiniDexColors
 import com.minidex.app.ui.theme.toColor
 
@@ -49,20 +45,15 @@ fun SettingsView(
     preferences: UserPreferences,
     dexDisplayInfo: DexDisplayInfo,
     isAccessibilityEnabled: Boolean,
-    isBluetoothHidReady: Boolean,
     activeBackendName: String,
-    bluetoothConnectionState: BluetoothHidConnectionState,
-    bluetoothError: String?,
-    bondedDevices: List<BluetoothDevice> = emptyList(),
     onOpenAccessibilitySettings: () -> Unit,
-    onStartBluetoothPairing: () -> Unit,
-    onConnectToBluetoothDevice: (BluetoothDevice) -> Unit = {},
-    onOpenBluetoothSettings: () -> Unit,
+    onOpenImeSettings: () -> Unit,
     onUpdatePreferences: ((UserPreferences) -> UserPreferences) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val colors = LocalMiniDexColors.current
     val scrollState = rememberScrollState()
+    val isImeActive = MiniDexInputMethodService.isImeActive()
 
     Column(
         modifier = modifier
@@ -71,8 +62,8 @@ fun SettingsView(
             .padding(horizontal = 4.dp, vertical = 2.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Section: DeX Status & Input Backend
-        SettingsCard(title = "DEX & INPUT ENGINE") {
+        // Section: DeX Status & Same-Device Drivers
+        SettingsCard(title = "SAMSUNG DEX & LOCAL DRIVERS") {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -81,20 +72,20 @@ fun SettingsView(
                 ) {
                     Column {
                         Text(
-                            text = if (dexDisplayInfo.isConnected) "DeX: Connected (#${dexDisplayInfo.displayId})" else "DeX: Standalone / Cover",
+                            text = if (dexDisplayInfo.isConnected) "DeX Monitor: Connected (#${dexDisplayInfo.displayId})" else "DeX Monitor: Standalone / Cover",
                             color = if (dexDisplayInfo.isConnected) colors.accent else colors.textSecondary,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Driver: $activeBackendName",
+                            text = "Active Engine: $activeBackendName",
                             color = colors.textSecondary,
                             fontSize = 9.sp
                         )
                     }
                 }
 
-                // Accessibility row
+                // Driver 1: Multi-Display Accessibility Direct Driver (Touchpad, Gestures, Clicks)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -102,158 +93,70 @@ fun SettingsView(
                         .background(if (isAccessibilityEnabled) colors.accent.copy(alpha = 0.2f) else colors.surfaceElevated)
                         .border(1.dp, if (isAccessibilityEnabled) colors.accent else colors.border.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
                         .clickable { onOpenAccessibilitySettings() }
-                        .padding(vertical = 5.dp),
-                    contentAlignment = Alignment.Center
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
                 ) {
-                    Text(
-                        text = if (isAccessibilityEnabled) "✓ Native DeX Direct Driver Active" else "⚙ Enable Accessibility Driver",
-                        color = if (isAccessibilityEnabled) colors.accent else colors.textPrimary,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                // Bluetooth HID row — Pair / Discoverable button + Settings
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    val btLabel = when (bluetoothConnectionState) {
-                        is BluetoothHidConnectionState.Connected -> "✓ Connected: ${bluetoothConnectionState.deviceName}"
-                        is BluetoothHidConnectionState.Connecting -> "⏳ Connecting..."
-                        is BluetoothHidConnectionState.Discoverable -> "📡 Discoverable: MiniDex (5m)"
-                        is BluetoothHidConnectionState.Disconnected -> "🔗 Pair as Bluetooth Device"
-                    }
-                    val btActive = bluetoothConnectionState is BluetoothHidConnectionState.Connected
-                    val btDiscoverable = bluetoothConnectionState is BluetoothHidConnectionState.Discoverable
-
-                    Box(
-                        modifier = Modifier
-                            .weight(2f)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(
-                                when {
-                                    btActive -> colors.accent.copy(alpha = 0.2f)
-                                    btDiscoverable -> Color(0xFF00BCD4).copy(alpha = 0.2f)
-                                    else -> colors.surfaceElevated
-                                }
-                            )
-                            .border(
-                                1.dp,
-                                when {
-                                    btActive -> colors.accent
-                                    btDiscoverable -> Color(0xFF00BCD4)
-                                    else -> colors.border.copy(alpha = 0.4f)
-                                },
-                                RoundedCornerShape(6.dp)
-                            )
-                            .clickable { onStartBluetoothPairing() }
-                            .padding(vertical = 5.dp),
-                        contentAlignment = Alignment.Center
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
+                        Column {
+                            Text(
+                                text = "1. Touchpad & Gestures Driver",
+                                color = colors.textPrimary,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = if (isAccessibilityEnabled) "✓ Multi-Display Engine Active" else "Tap to Enable in Accessibility",
+                                color = if (isAccessibilityEnabled) colors.accent else colors.textSecondary,
+                                fontSize = 7.5.sp
+                            )
+                        }
                         Text(
-                            text = btLabel,
-                            color = when {
-                                btActive -> colors.accent
-                                btDiscoverable -> Color(0xFF00BCD4)
-                                else -> colors.textPrimary
-                            },
+                            text = if (isAccessibilityEnabled) "ACTIVE" else "ENABLE →",
+                            color = if (isAccessibilityEnabled) colors.accent else colors.textSecondary,
                             fontSize = 8.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(colors.surfaceElevated)
-                            .border(1.dp, colors.border.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
-                            .clickable { onOpenBluetoothSettings() }
-                            .padding(vertical = 5.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "⚙ BT Settings",
-                            color = colors.textSecondary,
-                            fontSize = 7.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
                 }
 
-                // Bonded host devices list for quick 1-tap connection
-                if (bondedDevices.isNotEmpty() && bluetoothConnectionState !is BluetoothHidConnectionState.Connected) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 2.dp),
-                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                // Driver 2: Native Android IME Keyboard Engine (Text input into DeX windows)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (isImeActive) colors.accent.copy(alpha = 0.2f) else colors.surfaceElevated)
+                        .border(1.dp, if (isImeActive) colors.accent else colors.border.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                        .clickable { onOpenImeSettings() }
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "PAIRED HOSTS (TAP TO CONNECT):",
-                            color = colors.textSecondary,
-                            fontSize = 7.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        bondedDevices.take(3).forEach { device ->
-                            val devName = try { device.name } catch (_: SecurityException) { null } ?: device.address
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(colors.surfaceElevated)
-                                    .border(1.dp, colors.border.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
-                                    .clickable { onConnectToBluetoothDevice(device) }
-                                    .padding(horizontal = 6.dp, vertical = 3.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "💻 $devName",
-                                        color = colors.textPrimary,
-                                        fontSize = 8.sp
-                                    )
-                                    Text(
-                                        text = "Connect →",
-                                        color = colors.accent,
-                                        fontSize = 8.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
+                        Column {
+                            Text(
+                                text = "2. Native Keyboard IME Engine",
+                                color = colors.textPrimary,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = if (isImeActive) "✓ Direct DeX Typing Active" else "Tap to Enable in Keyboard Settings",
+                                color = if (isImeActive) colors.accent else colors.textSecondary,
+                                fontSize = 7.5.sp
+                            )
                         }
+                        Text(
+                            text = if (isImeActive) "ACTIVE" else "ENABLE →",
+                            color = if (isImeActive) colors.accent else colors.textSecondary,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
-                }
-
-                // Bluetooth error or pairing hint
-                if (bluetoothError != null) {
-                    Text(
-                        text = "⚠ $bluetoothError",
-                        color = Color(0xFFFF6B6B),
-                        fontSize = 7.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Color(0x33FF0000))
-                            .padding(4.dp)
-                    )
-                } else if (bluetoothConnectionState is BluetoothHidConnectionState.Discoverable) {
-                    Text(
-                        text = "📡 On your computer/host, open Bluetooth and pair with 'MiniDex Keyboard & Mouse'",
-                        color = Color(0xFF00BCD4),
-                        fontSize = 7.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Color(0x1A00BCD4))
-                            .padding(4.dp)
-                    )
                 }
             }
         }

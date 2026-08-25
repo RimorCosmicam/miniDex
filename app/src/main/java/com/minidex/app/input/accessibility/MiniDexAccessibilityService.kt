@@ -1,6 +1,7 @@
 package com.minidex.app.input.accessibility
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.accessibilityservice.GestureDescription
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -12,7 +13,6 @@ import android.util.Log
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import android.view.accessibility.AccessibilityWindowInfo
 
 class MiniDexAccessibilityService : AccessibilityService() {
 
@@ -27,11 +27,21 @@ class MiniDexAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
-        Log.i(TAG, "MiniDex Accessibility Service Connected and Active")
+        try {
+            val info = serviceInfo ?: AccessibilityServiceInfo()
+            info.flags = info.flags or
+                    AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or
+                    AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS or
+                    AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS
+            serviceInfo = info
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not set dynamic service flags", e)
+        }
+        Log.i(TAG, "MiniDex Accessibility Service Connected and Active for DeX")
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // Active event stream
+        // Event stream
     }
 
     override fun onInterrupt() {
@@ -45,7 +55,7 @@ class MiniDexAccessibilityService : AccessibilityService() {
     }
 
     /**
-     * Finds the active/focused node on the target DeX display or active window.
+     * Finds the active/focused node on the target DeX display.
      */
     fun findFocusedNodeOnDisplay(displayId: Int = -1): AccessibilityNodeInfo? {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -66,14 +76,14 @@ class MiniDexAccessibilityService : AccessibilityService() {
             }
         }
 
-        // Fallback: search default active window root
+        // Fallback: active window
         val root = rootInActiveWindow ?: return null
         return root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
             ?: root.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
     }
 
     /**
-     * Injects text directly into the focused input field on DeX using Accessibility actions.
+     * Injects text directly into the focused input field on DeX.
      */
     fun injectText(text: String, displayId: Int = -1): Boolean {
         val node = findFocusedNodeOnDisplay(displayId)
@@ -87,7 +97,7 @@ class MiniDexAccessibilityService : AccessibilityService() {
                 return true
             }
 
-            // Fallback: Paste via Clipboard
+            // Clipboard Paste fallback
             val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
             if (clipboard != null) {
                 val clip = ClipData.newPlainText("MiniDex Input", text)
@@ -101,7 +111,7 @@ class MiniDexAccessibilityService : AccessibilityService() {
     }
 
     /**
-     * Dispatches key code actions (e.g. Back, Home, Enter, Del) to the focused node or global system.
+     * Dispatches key code actions (Back, Home, Enter, Del) to DeX.
      */
     fun handleSpecialKey(keyCode: Int, displayId: Int = -1): Boolean {
         return when (keyCode) {
@@ -144,7 +154,7 @@ class MiniDexAccessibilityService : AccessibilityService() {
     }
 
     /**
-     * Dispatches a tap gesture directly to the specified display (DeX external display).
+     * Dispatches a tap gesture directly to the specified DeX external display.
      */
     fun dispatchClick(x: Float, y: Float, displayId: Int = -1, onComplete: (() -> Unit)? = null): Boolean {
         val path = Path().apply {
@@ -158,20 +168,19 @@ class MiniDexAccessibilityService : AccessibilityService() {
         }
 
         val gesture = builder.build()
-
         return dispatchGesture(gesture, object : GestureResultCallback() {
             override fun onCompleted(gestureDescription: GestureDescription?) {
-                Log.d(TAG, "Click gesture completed on display $displayId at ($x, $y)")
+                Log.d(TAG, "Tap executed on display $displayId at ($x, $y)")
                 onComplete?.invoke()
             }
             override fun onCancelled(gestureDescription: GestureDescription?) {
-                Log.w(TAG, "Click gesture cancelled on display $displayId at ($x, $y)")
+                Log.w(TAG, "Tap cancelled on display $displayId at ($x, $y)")
             }
         }, null)
     }
 
     /**
-     * Dispatches a drag gesture directly to the specified display.
+     * Dispatches a drag gesture directly to the specified DeX external display.
      */
     fun dispatchDrag(fromX: Float, fromY: Float, toX: Float, toY: Float, displayId: Int = -1, durationMs: Long = 80): Boolean {
         val path = Path().apply {
@@ -190,7 +199,7 @@ class MiniDexAccessibilityService : AccessibilityService() {
     }
 
     /**
-     * Dispatches a scroll gesture directly to the specified display.
+     * Dispatches a scroll gesture directly to the specified DeX external display.
      */
     fun dispatchScroll(x: Float, y: Float, dx: Float, dy: Float, displayId: Int = -1): Boolean {
         val path = Path().apply {

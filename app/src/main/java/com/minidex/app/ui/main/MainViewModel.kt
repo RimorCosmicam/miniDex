@@ -194,8 +194,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _showMacroEditor.value = visible
     }
 
+    fun attachActivity(activity: android.app.Activity) {
+        displayManager.attachActivity(activity)
+    }
+
     fun openAccessibilitySettings() {
         backendManager.openAccessibilitySettings()
+    }
+
+    fun openImeSettings() {
+        backendManager.openImeSettings()
     }
 
     fun startBluetoothPairing(): Intent? {

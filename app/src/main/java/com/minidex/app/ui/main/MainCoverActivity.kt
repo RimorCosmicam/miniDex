@@ -54,6 +54,9 @@ class MainCoverActivity : ComponentActivity() {
         // Request Bluetooth permissions for HID on Android 12+
         requestBluetoothPermissionsIfNeeded()
 
+        // Attach Activity to DeX Display Manager for Presentation window rendering
+        viewModel.attachActivity(this)
+
         setContent {
             MainScreen(viewModel = viewModel)
         }

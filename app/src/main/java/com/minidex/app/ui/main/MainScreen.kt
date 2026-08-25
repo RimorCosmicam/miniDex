@@ -50,10 +50,6 @@ fun MainScreen(viewModel: MainViewModel) {
     val activeDexDisplay by viewModel.activeDexDisplay.collectAsState()
     val activeBackend by viewModel.activeBackend.collectAsState()
     val isAccessibilityEnabled by viewModel.isAccessibilityEnabled.collectAsState()
-    val isBluetoothHidReady by viewModel.isBluetoothHidReady.collectAsState()
-    val bluetoothConnectionState by viewModel.backendManager.bluetoothHidBackend.connectionState.collectAsState()
-    val bluetoothError by viewModel.backendManager.bluetoothHidBackend.lastError.collectAsState()
-    val bondedDevices by viewModel.bondedDevices.collectAsState()
     val showMacroEditor by viewModel.showMacroEditor.collectAsState()
 
     MiniDexTheme(
@@ -172,25 +168,13 @@ fun MainScreen(viewModel: MainViewModel) {
                                         }
 
                                         KeyboardPage.SETTINGS -> {
-                                            val settingsContext = LocalContext.current
                                             SettingsView(
                                                 preferences = preferences,
                                                 dexDisplayInfo = activeDexDisplay,
                                                 isAccessibilityEnabled = isAccessibilityEnabled,
-                                                isBluetoothHidReady = isBluetoothHidReady,
                                                 activeBackendName = activeBackend.name,
-                                                bluetoothConnectionState = bluetoothConnectionState,
-                                                bluetoothError = bluetoothError,
-                                                bondedDevices = bondedDevices,
                                                 onOpenAccessibilitySettings = { viewModel.openAccessibilitySettings() },
-                                                onStartBluetoothPairing = {
-                                                    val intent = viewModel.startBluetoothPairing()
-                                                    if (intent != null) {
-                                                        settingsContext.startActivity(intent)
-                                                    }
-                                                },
-                                                onConnectToBluetoothDevice = { viewModel.connectToBluetoothDevice(it) },
-                                                onOpenBluetoothSettings = { viewModel.openBluetoothSettings() },
+                                                onOpenImeSettings = { viewModel.openImeSettings() },
                                                 onUpdatePreferences = { viewModel.updatePreferences(it) }
                                             )
                                         }
