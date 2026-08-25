@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -75,6 +76,11 @@ fun TouchpadView(
     var multiTapHandled by remember { mutableStateOf(false) }
     var isDragging by remember { mutableStateOf(false) }
     var isEdgeScrolling by remember { mutableStateOf(false) }
+    var rightClickPressed by remember { mutableStateOf(false) }
+    var rightClickDownTime by remember { mutableLongStateOf(0L) }
+    var rightClickDownX by remember { mutableFloatStateOf(0f) }
+    var rightClickDownY by remember { mutableFloatStateOf(0f) }
+    var rightClickHotspotSizePx by remember { mutableIntStateOf(0) }
     var touchpadWidthPx by remember { mutableIntStateOf(0) }
     val edgeWidthPx = with(LocalDensity.current) { 48.dp.toPx() }
 
@@ -315,6 +321,85 @@ fun TouchpadView(
             }
         }
 
+        // Simple, reliable right-click target: tap inside the top-right quarter circle.
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .size(76.dp)
+                .onSizeChanged { rightClickHotspotSizePx = it.width }
+                .pointerInteropFilter { event ->
+                    val distanceFromCorner = hypot(
+                        rightClickHotspotSizePx - event.x,
+                        event.y
+                    )
+                    val insideRadius = distanceFromCorner <= rightClickHotspotSizePx
+
+                    when (event.actionMasked) {
+                        MotionEvent.ACTION_DOWN -> {
+                            if (!insideRadius) return@pointerInteropFilter false
+                            rightClickPressed = true
+                            rightClickDownTime = SystemClock.uptimeMillis()
+                            rightClickDownX = event.x
+                            rightClickDownY = event.y
+                            true
+                        }
+
+                        MotionEvent.ACTION_MOVE -> {
+                            if (!rightClickPressed) return@pointerInteropFilter false
+                            rightClickPressed = insideRadius
+                            true
+                        }
+
+                        MotionEvent.ACTION_UP -> {
+                            if (!rightClickPressed) return@pointerInteropFilter false
+                            val movement = hypot(
+                                event.x - rightClickDownX,
+                                event.y - rightClickDownY
+                            )
+                            val isTap = insideRadius &&
+                                movement < 20f &&
+                                SystemClock.uptimeMillis() - rightClickDownTime < 500L
+                            rightClickPressed = false
+                            if (isTap) {
+                                onPointerClick(2)
+                                onHapticClick()
+                            }
+                            true
+                        }
+
+                        MotionEvent.ACTION_CANCEL -> {
+                            rightClickPressed = false
+                            true
+                        }
+
+                        else -> rightClickPressed
+                    }
+                }
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawCircle(
+                    color = colors.accent.copy(alpha = if (rightClickPressed) 0.28f else 0.10f),
+                    radius = size.minDimension,
+                    center = Offset(size.width, 0f)
+                )
+                drawCircle(
+                    color = colors.accent.copy(alpha = if (rightClickPressed) 0.9f else 0.45f),
+                    radius = size.minDimension,
+                    center = Offset(size.width, 0f),
+                    style = Stroke(width = 1.5.dp.toPx())
+                )
+            }
+            Text(
+                text = "R",
+                color = colors.textPrimary.copy(alpha = if (rightClickPressed) 0.95f else 0.55f),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(start = 18.dp, bottom = 18.dp)
+            )
+        }
+
         // Overlay status indicator
         Text(
             text = if (isDragging) "DRAGGING" else "TOUCHPAD",
@@ -329,7 +414,7 @@ fun TouchpadView(
 
         // Helper gestures hint
         Text(
-            text = "Edge: Scroll  •  2-Finger: Scroll/Right-Click  •  3-Finger: Back",
+            text = "Corner: Right-click  •  Edge: Scroll  •  2-Finger: Scroll  •  3-Finger: Back",
             color = colors.textSecondary.copy(alpha = 0.3f),
             fontSize = 8.sp,
             fontWeight = FontWeight.Normal,
