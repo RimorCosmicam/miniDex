@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Discovers and tracks external Samsung DeX display connections.
- * Pure display state manager without creating dimming Dialog/Presentation windows.
+ * Correctly differentiates between internal folding screen (0), cover screen (1), and external DeX monitor (2+).
  */
 class DexDisplayManager(
     private val context: Context,
@@ -97,7 +97,7 @@ class DexDisplayManager(
                 findBestDexCandidate(detectedList)
             }
 
-            _activeDexDisplay.value = selected ?: DexDisplayInfo.Disconnected
+            _activeDexDisplay.value = selected ?: detectedList.firstOrNull { it.displayId != Display.DEFAULT_DISPLAY } ?: DexDisplayInfo.Disconnected
             Log.i(TAG, "Active DeX Display detected: ${_activeDexDisplay.value}")
         }
     }
@@ -106,16 +106,16 @@ class DexDisplayManager(
         // Priority 1: Explicit DeX name matching
         displays.firstOrNull { it.name.contains("DeX", ignoreCase = true) }?.let { return it }
 
-        // Priority 2: External Presentation display
+        // Priority 2: External Presentation display (standard for DeX monitor)
         displays.firstOrNull { it.isPresentation && it.isExternal }?.let { return it }
 
-        // Priority 3: Any external display with typical desktop resolution (>= 1280x720) and not display 0
+        // Priority 3: External monitor with desktop resolution (>= 1280px and not cover screen)
         displays.firstOrNull {
-            it.isExternal && (it.width >= 1280 || it.height >= 1280)
+            it.isExternal && (it.width >= 1280 || it.height >= 1280) && !it.name.contains("cover", ignoreCase = true) && !it.name.contains("sub", ignoreCase = true)
         }?.let { return it }
 
-        // Priority 4: Any non-default display
-        displays.firstOrNull { it.isExternal }?.let { return it }
+        // Priority 4: Highest display ID that isn't display 0
+        displays.filter { it.isExternal }.maxByOrNull { it.displayId }?.let { return it }
 
         return null
     }

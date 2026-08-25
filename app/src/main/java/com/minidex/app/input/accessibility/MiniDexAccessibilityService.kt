@@ -7,9 +7,11 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Path
+import android.hardware.display.DisplayManager
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.view.Display
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -62,16 +64,28 @@ class MiniDexAccessibilityService : AccessibilityService() {
         lastTargetNode = null
     }
 
+    private fun resolveTargetDisplayId(preferredDisplayId: Int): Int {
+        if (preferredDisplayId > 0) return preferredDisplayId
+
+        // Find highest external display ID
+        val dm = getSystemService(Context.DISPLAY_SERVICE) as? DisplayManager ?: return 0
+        val displays = dm.displays
+        val external = displays.filter { it.displayId != Display.DEFAULT_DISPLAY }
+        return external.maxByOrNull { it.displayId }?.displayId ?: Display.DEFAULT_DISPLAY
+    }
+
     /**
      * Finds the active, editable, or focused node on the target DeX display.
      */
     fun findFocusedNodeOnDisplay(displayId: Int = -1): AccessibilityNodeInfo? {
+        val targetId = resolveTargetDisplayId(displayId)
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val allDisplayWindows = windowsOnAllDisplays
             if (allDisplayWindows.size() > 0) {
                 for (i in 0 until allDisplayWindows.size()) {
                     val currentDisplayId = allDisplayWindows.keyAt(i)
-                    if (displayId < 0 || currentDisplayId == displayId) {
+                    if (targetId <= 0 || currentDisplayId == targetId) {
                         val windowList = allDisplayWindows.valueAt(i)
                         for (window in windowList) {
                             val root = window.root ?: continue
@@ -123,7 +137,7 @@ class MiniDexAccessibilityService : AccessibilityService() {
      * Injects text directly into the target input field on DeX.
      */
     fun injectText(text: String, displayId: Int = -1): Boolean {
-        // Copy to system clipboard first as universal delivery
+        // Universal clipboard copy
         try {
             val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
             if (clipboard != null) {
@@ -198,24 +212,25 @@ class MiniDexAccessibilityService : AccessibilityService() {
      * Dispatches a tap gesture directly to the specified DeX external display.
      */
     fun dispatchClick(x: Float, y: Float, displayId: Int = -1, onComplete: (() -> Unit)? = null): Boolean {
+        val targetId = resolveTargetDisplayId(displayId)
         val path = Path().apply {
             moveTo(x.coerceAtLeast(0f), y.coerceAtLeast(0f))
         }
         val stroke = GestureDescription.StrokeDescription(path, 0, 40)
         val builder = GestureDescription.Builder().addStroke(stroke)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && displayId >= 0) {
-            builder.setDisplayId(displayId)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && targetId >= 0) {
+            builder.setDisplayId(targetId)
         }
 
         val gesture = builder.build()
         return dispatchGesture(gesture, object : GestureResultCallback() {
             override fun onCompleted(gestureDescription: GestureDescription?) {
-                Log.d(TAG, "Tap executed on display $displayId at ($x, $y)")
+                Log.d(TAG, "Tap executed on display $targetId at ($x, $y)")
                 onComplete?.invoke()
             }
             override fun onCancelled(gestureDescription: GestureDescription?) {
-                Log.w(TAG, "Tap cancelled on display $displayId at ($x, $y)")
+                Log.w(TAG, "Tap cancelled on display $targetId at ($x, $y)")
             }
         }, null)
     }
@@ -224,6 +239,7 @@ class MiniDexAccessibilityService : AccessibilityService() {
      * Dispatches a drag gesture directly to the specified DeX external display.
      */
     fun dispatchDrag(fromX: Float, fromY: Float, toX: Float, toY: Float, displayId: Int = -1, durationMs: Long = 60): Boolean {
+        val targetId = resolveTargetDisplayId(displayId)
         val path = Path().apply {
             moveTo(fromX.coerceAtLeast(0f), fromY.coerceAtLeast(0f))
             lineTo(toX.coerceAtLeast(0f), toY.coerceAtLeast(0f))
@@ -231,8 +247,8 @@ class MiniDexAccessibilityService : AccessibilityService() {
         val stroke = GestureDescription.StrokeDescription(path, 0, durationMs.coerceAtLeast(20L))
         val builder = GestureDescription.Builder().addStroke(stroke)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && displayId >= 0) {
-            builder.setDisplayId(displayId)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && targetId >= 0) {
+            builder.setDisplayId(targetId)
         }
 
         val gesture = builder.build()
@@ -243,6 +259,7 @@ class MiniDexAccessibilityService : AccessibilityService() {
      * Dispatches a scroll gesture directly to the specified DeX external display.
      */
     fun dispatchScroll(x: Float, y: Float, dx: Float, dy: Float, displayId: Int = -1): Boolean {
+        val targetId = resolveTargetDisplayId(displayId)
         val path = Path().apply {
             moveTo(x.coerceAtLeast(0f), y.coerceAtLeast(0f))
             lineTo((x - dx).coerceAtLeast(0f), (y - dy).coerceAtLeast(0f))
@@ -250,8 +267,8 @@ class MiniDexAccessibilityService : AccessibilityService() {
         val stroke = GestureDescription.StrokeDescription(path, 0, 50)
         val builder = GestureDescription.Builder().addStroke(stroke)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && displayId >= 0) {
-            builder.setDisplayId(displayId)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && targetId >= 0) {
+            builder.setDisplayId(targetId)
         }
 
         val gesture = builder.build()
