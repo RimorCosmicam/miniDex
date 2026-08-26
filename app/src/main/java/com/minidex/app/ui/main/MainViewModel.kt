@@ -19,6 +19,7 @@ import com.minidex.app.input.InputBackendManager
 import com.minidex.app.input.adb.AdbConnectionStatus
 import com.minidex.app.ui.components.HapticFeedbackManager
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,6 +30,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.channels.Channel
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -37,6 +39,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val displayManager = DexDisplayManager(application, viewModelScope)
     val backendManager = InputBackendManager(application, viewModelScope)
     val hapticManager = HapticFeedbackManager(application)
+    private val keyboardActions = Channel<suspend () -> Unit>(Channel.UNLIMITED)
 
     val userPreferences: StateFlow<UserPreferences> = preferencesRepository.userPreferencesFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, UserPreferences())
@@ -83,6 +86,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
     init {
+        viewModelScope.launch(Dispatchers.IO) {
+            for (action in keyboardActions) {
+                runCatching { action() }
+            }
+        }
+
         viewModelScope.launch {
             userPreferences.collect { preferences ->
                 backendManager.adbBackend.setCursorMode(preferences.cursorMode)
@@ -137,7 +146,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun handleSwipeWord(word: String) {
         if (word.isBlank()) return
-        activeBackend.value.sendText("$word ", targetDisplayId)
+        keyboardActions.trySend {
+            activeBackend.value.sendText("$word ", targetDisplayId)
+        }
         hapticManager.performHaptic(userPreferences.value.hapticStrength)
     }
 
@@ -157,10 +168,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val meta = modifiers.toMetaState()
         val isShortcut = modifiers.ctrl.isActive || modifiers.alt.isActive || modifiers.meta.isActive
         if (isShortcut) {
-            activeBackend.value.sendKeyPress(keyCode, meta, targetDisplayId)
+            keyboardActions.trySend {
+                activeBackend.value.sendKeyPress(keyCode, meta, targetDisplayId)
+            }
         } else {
             val text = if (modifiers.shift.isActive) char.uppercase() else char.toString()
-            activeBackend.value.sendText(text, targetDisplayId)
+            keyboardActions.trySend {
+                activeBackend.value.sendText(text, targetDisplayId)
+            }
         }
         _modifierState.value = _modifierState.value.consumeLatched()
         hapticManager.performHaptic(userPreferences.value.hapticStrength)
@@ -168,13 +183,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun handleKeyPress(keyCode: Int) {
         val meta = _modifierState.value.toMetaState()
-        activeBackend.value.sendKeyPress(keyCode, meta, targetDisplayId)
+        keyboardActions.trySend {
+            activeBackend.value.sendKeyPress(keyCode, meta, targetDisplayId)
+        }
         _modifierState.value = _modifierState.value.consumeLatched()
         hapticManager.performHaptic(userPreferences.value.hapticStrength)
     }
 
     fun handleShortcut(name: String, keyCodes: List<Int>, modifiers: List<ModifierType>) {
-        viewModelScope.launch {
+        keyboardActions.trySend {
             var tempState = ModifierState()
             modifiers.forEach { mod ->
                 tempState = tempState.withModifier(mod, com.minidex.app.domain.model.ModifierLockState.LATCHED)
@@ -183,13 +200,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             keyCodes.forEach { code ->
                 activeBackend.value.sendKeyPress(code, meta, targetDisplayId)
             }
-            hapticManager.performHaptic(userPreferences.value.hapticStrength)
         }
+        hapticManager.performHaptic(userPreferences.value.hapticStrength)
     }
 
     fun executeMacro(macro: Macro) {
-        viewModelScope.launch {
-            hapticManager.performHaptic(userPreferences.value.hapticStrength)
+        keyboardActions.trySend {
             for (step in macro.steps) {
                 when (step) {
                     is MacroStep.KeyPress -> {
@@ -227,6 +243,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 delay(15)
             }
         }
+        hapticManager.performHaptic(userPreferences.value.hapticStrength)
     }
 
     fun handlePointerMove(dx: Float, dy: Float) {

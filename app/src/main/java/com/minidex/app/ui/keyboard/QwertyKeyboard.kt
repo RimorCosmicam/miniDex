@@ -1,6 +1,7 @@
 package com.minidex.app.ui.keyboard
 
 import android.view.KeyEvent
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,9 +19,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -28,6 +34,9 @@ import com.minidex.app.domain.model.ModifierLockState
 import com.minidex.app.domain.model.ModifierType
 import com.minidex.app.ui.components.KeyButton
 import com.minidex.app.ui.theme.LocalMiniDexColors
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun QwertyKeyboard(
@@ -43,11 +52,10 @@ fun QwertyKeyboard(
 ) {
     val isShifted = shiftState.isActive
     val colors = LocalMiniDexColors.current
-    var typedPreview by remember { mutableStateOf("") }
-
-    fun appendPreview(text: String) {
-        typedPreview = (typedPreview + text).takeLast(48)
-    }
+    val scope = rememberCoroutineScope()
+    var glideTrail by remember { mutableStateOf<List<Offset>>(emptyList()) }
+    var glideCandidate by remember { mutableStateOf("") }
+    var clearTrailJob by remember { mutableStateOf<Job?>(null) }
 
     val row1 = listOf(
         Triple('q', KeyEvent.KEYCODE_Q, "1"),
@@ -84,39 +92,30 @@ fun QwertyKeyboard(
         Pair('m', KeyEvent.KEYCODE_M)
     )
 
-    Column(
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .swipeTyping { word ->
-                appendPreview("$word ")
-                onSwipeWord(word)
-            },
-        verticalArrangement = Arrangement.spacedBy(keyGap)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(27.dp)
-                .background(
-                    color = colors.surfaceElevated.copy(alpha = 0.72f),
-                    shape = RoundedCornerShape(cornerRadius)
-                ),
-            contentAlignment = Alignment.CenterStart
-        ) {
-            Text(
-                text = typedPreview.ifEmpty { "Type or swipe…" },
-                color = if (typedPreview.isEmpty()) {
-                    colors.textSecondary.copy(alpha = 0.55f)
-                } else {
-                    colors.textPrimary
+            .swipeTyping(
+                onTrailChanged = { points ->
+                    if (points.isNotEmpty()) clearTrailJob?.cancel()
+                    glideTrail = points
                 },
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                modifier = Modifier.padding(horizontal = 10.dp)
+                onCandidateChanged = { glideCandidate = it },
+                onWord = { word ->
+                    onSwipeWord(word)
+                    clearTrailJob?.cancel()
+                    clearTrailJob = scope.launch {
+                        delay(220)
+                        glideTrail = emptyList()
+                        glideCandidate = ""
+                    }
+                }
             )
-        }
-
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(keyGap)
+        ) {
         // Row 1: Q W E R T Y U I O P
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -129,10 +128,7 @@ fun QwertyKeyboard(
                     subLabel = sub,
                     modifier = Modifier.weight(1f).height(keyHeight),
                     cornerRadius = cornerRadius,
-                    onTap = {
-                        appendPreview(displayChar.toString())
-                        onCharPress(displayChar, keyCode)
-                    }
+                    onTap = { onCharPress(displayChar, keyCode) }
                 )
             }
         }
@@ -150,10 +146,7 @@ fun QwertyKeyboard(
                     subLabel = sub,
                     modifier = Modifier.weight(1f).height(keyHeight),
                     cornerRadius = cornerRadius,
-                    onTap = {
-                        appendPreview(displayChar.toString())
-                        onCharPress(displayChar, keyCode)
-                    }
+                    onTap = { onCharPress(displayChar, keyCode) }
                 )
             }
             Spacer(modifier = Modifier.weight(0.5f))
@@ -180,10 +173,7 @@ fun QwertyKeyboard(
                     label = displayChar.toString(),
                     modifier = Modifier.weight(1f).height(keyHeight),
                     cornerRadius = cornerRadius,
-                    onTap = {
-                        appendPreview(displayChar.toString())
-                        onCharPress(displayChar, keyCode)
-                    }
+                    onTap = { onCharPress(displayChar, keyCode) }
                 )
             }
 
@@ -192,10 +182,7 @@ fun QwertyKeyboard(
                 label = "⌫",
                 modifier = Modifier.weight(1.5f).height(keyHeight),
                 cornerRadius = cornerRadius,
-                onTap = {
-                    typedPreview = typedPreview.dropLast(1)
-                    onKeyPress(KeyEvent.KEYCODE_DEL)
-                }
+                onTap = { onKeyPress(KeyEvent.KEYCODE_DEL) }
             )
         }
 
@@ -209,10 +196,7 @@ fun QwertyKeyboard(
                 subLabel = "?",
                 modifier = Modifier.weight(1.2f).height(keyHeight),
                 cornerRadius = cornerRadius,
-                onTap = {
-                    appendPreview(",")
-                    onCharPress(',', KeyEvent.KEYCODE_COMMA)
-                }
+                onTap = { onCharPress(',', KeyEvent.KEYCODE_COMMA) }
             )
 
             // Spacebar
@@ -221,10 +205,7 @@ fun QwertyKeyboard(
                 subLabel = "SPACE",
                 modifier = Modifier.weight(4.5f).height(keyHeight),
                 cornerRadius = cornerRadius,
-                onTap = {
-                    appendPreview(" ")
-                    onKeyPress(KeyEvent.KEYCODE_SPACE)
-                }
+                onTap = { onKeyPress(KeyEvent.KEYCODE_SPACE) }
             )
 
             KeyButton(
@@ -232,10 +213,7 @@ fun QwertyKeyboard(
                 subLabel = "!",
                 modifier = Modifier.weight(1.2f).height(keyHeight),
                 cornerRadius = cornerRadius,
-                onTap = {
-                    appendPreview(".")
-                    onCharPress('.', KeyEvent.KEYCODE_PERIOD)
-                }
+                onTap = { onCharPress('.', KeyEvent.KEYCODE_PERIOD) }
             )
 
             // Enter Key
@@ -244,10 +222,44 @@ fun QwertyKeyboard(
                 modifier = Modifier.weight(1.8f).height(keyHeight),
                 cornerRadius = cornerRadius,
                 accentColor = colors.accent,
-                onTap = {
-                    typedPreview = ""
-                    onKeyPress(KeyEvent.KEYCODE_ENTER)
+                onTap = { onKeyPress(KeyEvent.KEYCODE_ENTER) }
+            )
+        }
+        }
+
+        if (glideTrail.size > 1) {
+            Canvas(modifier = Modifier.matchParentSize()) {
+                val path = Path().apply {
+                    moveTo(glideTrail.first().x, glideTrail.first().y)
+                    glideTrail.drop(1).forEach { point -> lineTo(point.x, point.y) }
                 }
+                drawPath(
+                    path = path,
+                    color = colors.accent.copy(alpha = 0.82f),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(
+                        width = 5.dp.toPx(),
+                        cap = StrokeCap.Round
+                    )
+                )
+                drawCircle(
+                    color = colors.accent,
+                    radius = 5.dp.toPx(),
+                    center = glideTrail.last()
+                )
+            }
+        }
+
+        if (glideCandidate.isNotEmpty()) {
+            Text(
+                text = glideCandidate,
+                color = colors.background,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 4.dp)
+                    .background(colors.accent, RoundedCornerShape(50))
+                    .padding(horizontal = 12.dp, vertical = 4.dp)
             )
         }
     }

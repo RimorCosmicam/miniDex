@@ -85,13 +85,20 @@ private fun keyAt(position: Offset, width: Float, height: Float): Char? {
     }
 }
 
-fun Modifier.swipeTyping(onWord: (String) -> Unit): Modifier = pointerInput(onWord) {
+fun Modifier.swipeTyping(
+    onTrailChanged: (List<Offset>) -> Unit,
+    onCandidateChanged: (String) -> Unit,
+    onWord: (String) -> Unit
+): Modifier = pointerInput(onTrailChanged, onCandidateChanged, onWord) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
         var lastPosition = down.position
         var distance = 0f
         var swiping = false
         val path = StringBuilder()
+        val trail = mutableListOf(down.position)
+        onTrailChanged(emptyList())
+        onCandidateChanged("")
         keyAt(down.position, size.width.toFloat(), size.height.toFloat())?.let(path::append)
 
         var pressed = true
@@ -103,17 +110,39 @@ fun Modifier.swipeTyping(onWord: (String) -> Unit): Modifier = pointerInput(onWo
                 (position.x - lastPosition.x).toDouble(),
                 (position.y - lastPosition.y).toDouble()
             ).toFloat()
-            if (distance > 28f) swiping = true
+            if (distance > 28f && !swiping) {
+                swiping = true
+                onTrailChanged(trail.toList())
+            }
             if (swiping) {
                 change.consume()
+                if (hypot(
+                        (position.x - trail.last().x).toDouble(),
+                        (position.y - trail.last().y).toDouble()
+                    ) > 7.0
+                ) {
+                    trail.add(position)
+                    if (trail.size > 80) trail.removeAt(0)
+                    onTrailChanged(trail.toList())
+                }
                 keyAt(position, size.width.toFloat(), size.height.toFloat())?.let { key ->
-                    if (path.isEmpty() || path.last() != key) path.append(key)
+                    if (path.isEmpty() || path.last() != key) {
+                        path.append(key)
+                        if (path.length >= 2) onCandidateChanged(decodeSwipe(path.toString()))
+                    }
                 }
             }
             lastPosition = position
             pressed = event.changes.any { it.pressed }
         }
 
-        if (swiping && path.length >= 2) onWord(decodeSwipe(path.toString()))
+        if (swiping && path.length >= 2) {
+            val word = decodeSwipe(path.toString())
+            onCandidateChanged(word)
+            onWord(word)
+        } else {
+            onTrailChanged(emptyList())
+            onCandidateChanged("")
+        }
     }
 }

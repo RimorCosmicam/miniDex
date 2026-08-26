@@ -389,15 +389,6 @@ fun TouchpadView(
                     style = Stroke(width = 1.5.dp.toPx())
                 )
             }
-            Text(
-                text = "R",
-                color = colors.textPrimary.copy(alpha = if (rightClickPressed) 0.95f else 0.55f),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(start = 18.dp, bottom = 18.dp)
-            )
         }
 
         // Overlay status indicator

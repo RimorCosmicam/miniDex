@@ -3,8 +3,6 @@ package com.minidex.app.input.accessibility
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.accessibilityservice.GestureDescription
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Path
 import android.hardware.display.DisplayManager
@@ -137,15 +135,6 @@ class MiniDexAccessibilityService : AccessibilityService() {
      * Injects text directly into the target input field on DeX.
      */
     fun injectText(text: String, displayId: Int = -1): Boolean {
-        // Universal clipboard copy
-        try {
-            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-            if (clipboard != null) {
-                val clip = ClipData.newPlainText("MiniDex Input", text)
-                clipboard.setPrimaryClip(clip)
-            }
-        } catch (_: Exception) {}
-
         val node = findFocusedNodeOnDisplay(displayId)
         if (node != null) {
             val currentText = node.text?.toString() ?: ""
@@ -154,11 +143,6 @@ class MiniDexAccessibilityService : AccessibilityService() {
                 putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, newText)
             }
             if (node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) {
-                return true
-            }
-
-            // Clipboard Paste fallback
-            if (node.performAction(AccessibilityNodeInfo.ACTION_PASTE)) {
                 return true
             }
         }
