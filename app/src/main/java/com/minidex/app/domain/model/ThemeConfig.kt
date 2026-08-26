@@ -26,7 +26,8 @@ enum class VisualFilter(val displayName: String) {
     VIVID("Vivid"),
     MONO("Mono"),
     WARM("Warm"),
-    COOL("Cool")
+    COOL("Cool"),
+    CHROMATIC("Chroma")
 }
 
 @Serializable

@@ -132,5 +132,13 @@ fun ProceduralThemeBackground(
                 }
             }
         }
+
+        if (filter == VisualFilter.CHROMATIC) {
+            val x = size.width * (0.5f + sin(phase * PI * 2).toFloat() * 0.18f)
+            drawLine(Color.Red.copy(alpha = 0.18f), Offset(x - 7f, 0f), Offset(x - 7f, size.height), 3f)
+            drawLine(Color.Cyan.copy(alpha = 0.18f), Offset(x + 7f, 0f), Offset(x + 7f, size.height), 3f)
+            drawCircle(Color.Red.copy(alpha = 0.08f), size.minDimension * 0.22f, Offset(size.width * 0.34f - 8f, size.height * 0.55f))
+            drawCircle(Color.Cyan.copy(alpha = 0.08f), size.minDimension * 0.22f, Offset(size.width * 0.34f + 8f, size.height * 0.55f))
+        }
     }
 }

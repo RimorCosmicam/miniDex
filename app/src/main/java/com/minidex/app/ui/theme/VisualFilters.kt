@@ -15,10 +15,11 @@ fun VisualFilter.applyTo(color: Color): Color = when (this) {
     }
     VisualFilter.WARM -> lerp(color, Color(0xFFFF9A55), 0.28f)
     VisualFilter.COOL -> lerp(color, Color(0xFF6EC8FF), 0.28f)
+    VisualFilter.CHROMATIC -> color
 }
 
 fun VisualFilter.toAndroidColorFilter(): android.graphics.ColorFilter? {
-    if (this == VisualFilter.NONE) return null
+    if (this == VisualFilter.NONE || this == VisualFilter.CHROMATIC) return null
     val matrix = when (this) {
         VisualFilter.NONE -> ColorMatrix()
         VisualFilter.VIVID -> ColorMatrix().apply { setSaturation(1.45f) }
@@ -39,6 +40,29 @@ fun VisualFilter.toAndroidColorFilter(): android.graphics.ColorFilter? {
                 0f, 0f, 0f, 1f, 0f
             )
         )
+        VisualFilter.CHROMATIC -> ColorMatrix()
     }
     return ColorMatrixColorFilter(matrix)
 }
+
+fun chromaticRedFilter(): android.graphics.ColorFilter = ColorMatrixColorFilter(
+    ColorMatrix(
+        floatArrayOf(
+            1f, 0f, 0f, 0f, 0f,
+            0f, 0f, 0f, 0f, 0f,
+            0f, 0f, 0f, 0f, 0f,
+            0.213f, 0.715f, 0.072f, 0f, 0f
+        )
+    )
+)
+
+fun chromaticCyanFilter(): android.graphics.ColorFilter = ColorMatrixColorFilter(
+    ColorMatrix(
+        floatArrayOf(
+            0f, 0f, 0f, 0f, 0f,
+            0f, 1f, 0f, 0f, 0f,
+            0f, 0f, 1f, 0f, 0f,
+            0.213f, 0.715f, 0.072f, 0f, 0f
+        )
+    )
+)

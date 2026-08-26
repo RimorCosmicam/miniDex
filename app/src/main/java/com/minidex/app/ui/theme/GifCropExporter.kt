@@ -63,10 +63,18 @@ object GifCropExporter {
                                     (outputHeight - drawable.intrinsicHeight * actualScale) / 2f + offsetY * outputHeight / 2f
                                 )
                             }
+                            val canvas = Canvas(bitmap)
                             val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                                 colorFilter = filter.toAndroidColorFilter()
                             }
-                            Canvas(bitmap).drawBitmap(drawable.currentFrame, matrix, paint)
+                            canvas.drawBitmap(drawable.currentFrame, matrix, paint)
+                            if (filter == VisualFilter.CHROMATIC) {
+                                val ghostPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { alpha = 92 }
+                                ghostPaint.colorFilter = chromaticRedFilter()
+                                canvas.drawBitmap(drawable.currentFrame, Matrix(matrix).apply { postTranslate(-8f, 0f) }, ghostPaint)
+                                ghostPaint.colorFilter = chromaticCyanFilter()
+                                canvas.drawBitmap(drawable.currentFrame, Matrix(matrix).apply { postTranslate(8f, 0f) }, ghostPaint)
+                            }
                             val pixels = IntArray(outputWidth * outputHeight)
                             bitmap.getPixels(pixels, 0, outputWidth, 0, 0, outputWidth, outputHeight)
                             val rgb = Array(outputHeight) { row ->
