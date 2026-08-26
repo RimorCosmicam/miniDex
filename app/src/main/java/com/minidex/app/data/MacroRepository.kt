@@ -54,66 +54,53 @@ class MacroRepository(private val context: Context) {
             )
         ),
         Macro(
-            id = "task_mgr",
-            name = "Task Mgr",
-            description = "Ctrl + Shift + Esc",
+            id = "back",
+            name = "Back",
+            description = "Android Back",
             iconName = "monitor_heart",
             colorHex = "#FF007F",
             steps = listOf(
-                MacroStep.KeyChord(listOf(KeyEvent.KEYCODE_ESCAPE), listOf(ModifierType.CTRL, ModifierType.SHIFT))
+                MacroStep.KeyPress(KeyEvent.KEYCODE_BACK)
             )
         ),
         Macro(
-            id = "run_dialog",
-            name = "Run Terminal",
-            description = "Win + R -> cmd",
+            id = "search",
+            name = "Search",
+            description = "Android Search",
             iconName = "terminal",
             colorHex = "#B388FF",
             steps = listOf(
-                MacroStep.KeyChord(listOf(KeyEvent.KEYCODE_R), listOf(ModifierType.META)),
-                MacroStep.Delay(250),
-                MacroStep.TypeText("cmd"),
-                MacroStep.KeyPress(KeyEvent.KEYCODE_ENTER)
+                MacroStep.KeyPress(KeyEvent.KEYCODE_SEARCH)
             )
         ),
         Macro(
             id = "screenshot",
             name = "Capture",
-            description = "Win + Shift + S",
+            description = "Screenshot",
             iconName = "screenshot",
             colorHex = "#00E5FF",
             steps = listOf(
-                MacroStep.KeyChord(listOf(KeyEvent.KEYCODE_S), listOf(ModifierType.META, ModifierType.SHIFT))
+                MacroStep.KeyPress(KeyEvent.KEYCODE_SYSRQ)
             )
         ),
         Macro(
-            id = "show_desktop",
-            name = "Desktop",
-            description = "Win + D",
+            id = "home",
+            name = "Home",
+            description = "Android Home",
             iconName = "desktop_windows",
             colorHex = "#00FFA3",
             steps = listOf(
-                MacroStep.KeyChord(listOf(KeyEvent.KEYCODE_D), listOf(ModifierType.META))
+                MacroStep.KeyPress(KeyEvent.KEYCODE_HOME)
             )
         ),
         Macro(
-            id = "close_window",
-            name = "Close App",
-            description = "Alt + F4",
+            id = "recents",
+            name = "Recents",
+            description = "Android app switcher",
             iconName = "close",
             colorHex = "#FF5252",
             steps = listOf(
-                MacroStep.KeyChord(listOf(KeyEvent.KEYCODE_F4), listOf(ModifierType.ALT))
-            )
-        ),
-        Macro(
-            id = "switch_app",
-            name = "Alt+Tab",
-            description = "Switch active window",
-            iconName = "tab",
-            colorHex = "#FFD740",
-            steps = listOf(
-                MacroStep.KeyChord(listOf(KeyEvent.KEYCODE_TAB), listOf(ModifierType.ALT))
+                MacroStep.KeyPress(KeyEvent.KEYCODE_APP_SWITCH)
             )
         )
     )

@@ -5,10 +5,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,7 +15,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,6 +46,7 @@ fun KeyButton(
     onDoubleTap: (() -> Unit)? = null
 ) {
     val colors = LocalMiniDexColors.current
+    var isPressed by remember { mutableStateOf(false) }
 
     val isLatched = lockState == ModifierLockState.LATCHED
     val isLocked = lockState == ModifierLockState.LOCKED
@@ -73,14 +73,33 @@ fun KeyButton(
     }
 
     val shape = RoundedCornerShape(cornerRadius)
+    val animatedBackground by animateColorAsState(
+        targetValue = if (isPressed) colors.accent.copy(alpha = 0.34f) else targetBg,
+        animationSpec = tween(70),
+        label = "key_background"
+    )
+    val animatedScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.94f else 1f,
+        animationSpec = tween(70),
+        label = "key_scale"
+    )
 
     Box(
         modifier = modifier
+            .scale(animatedScale)
             .clip(shape)
-            .background(targetBg, shape)
+            .background(animatedBackground, shape)
             .border(1.dp, targetBorder, shape)
-            .pointerInput(Unit) {
+            .pointerInput(onTap, onLongPress, onDoubleTap) {
                 detectTapGestures(
+                    onPress = {
+                        isPressed = true
+                        try {
+                            tryAwaitRelease()
+                        } finally {
+                            isPressed = false
+                        }
+                    },
                     onTap = { onTap() },
                     onLongPress = onLongPress?.let { lp -> { lp() } },
                     onDoubleTap = onDoubleTap?.let { dt -> { dt() } }

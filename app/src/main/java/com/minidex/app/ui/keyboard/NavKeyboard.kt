@@ -13,7 +13,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.minidex.app.domain.model.ModifierType
 import com.minidex.app.ui.components.KeyButton
 import com.minidex.app.ui.theme.LocalMiniDexColors
 
@@ -23,7 +22,6 @@ fun NavKeyboard(
     keyGap: Dp = 3.dp,
     cornerRadius: Dp = 8.dp,
     onKeyPress: (Int) -> Unit,
-    onShortcut: (String, List<Int>, List<ModifierType>) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val colors = LocalMiniDexColors.current
@@ -98,13 +96,14 @@ fun NavKeyboard(
                 onTap = { onKeyPress(KeyEvent.KEYCODE_PAGE_DOWN) }
             )
             KeyButton(
-                label = "INS",
+                label = "BACK",
                 modifier = Modifier.weight(0.9f).height(keyHeight),
                 cornerRadius = cornerRadius,
-                onTap = { onKeyPress(KeyEvent.KEYCODE_INSERT) }
+                onTap = { onKeyPress(KeyEvent.KEYCODE_BACK) }
             )
             KeyButton(
-                label = "PRTSC",
+                label = "SCREEN",
+                subLabel = "Shot",
                 modifier = Modifier.weight(1.1f).height(keyHeight),
                 cornerRadius = cornerRadius,
                 accentColor = colors.accent,
@@ -117,13 +116,12 @@ fun NavKeyboard(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(keyGap)
         ) {
-            // Task View (Win+Tab)
+            // Native Android task switcher.
             KeyButton(
-                label = "WIN+TAB",
-                subLabel = "Tasks",
+                label = "RECENTS",
                 modifier = Modifier.weight(1.3f).height(keyHeight),
                 cornerRadius = cornerRadius,
-                onTap = { onShortcut("TaskView", listOf(KeyEvent.KEYCODE_TAB), listOf(ModifierType.META)) }
+                onTap = { onKeyPress(KeyEvent.KEYCODE_APP_SWITCH) }
             )
 
             // D-PAD: LEFT, UP, DOWN, RIGHT
@@ -152,14 +150,13 @@ fun NavKeyboard(
                 onTap = { onKeyPress(KeyEvent.KEYCODE_DPAD_RIGHT) }
             )
 
-            // Close Window (Alt+F4)
+            // Android Home replaces the Windows-specific Alt+F4 shortcut.
             KeyButton(
-                label = "ALT+F4",
-                subLabel = "Close",
+                label = "HOME",
                 modifier = Modifier.weight(1.2f).height(keyHeight),
                 cornerRadius = cornerRadius,
                 accentColor = colors.accent,
-                onTap = { onShortcut("Close", listOf(KeyEvent.KEYCODE_F4), listOf(ModifierType.ALT)) }
+                onTap = { onKeyPress(KeyEvent.KEYCODE_HOME) }
             )
         }
     }

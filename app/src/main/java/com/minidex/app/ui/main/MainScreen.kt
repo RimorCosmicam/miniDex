@@ -175,8 +175,7 @@ fun MainScreen(viewModel: MainViewModel) {
                                                 keyHeight = preferences.keyHeightLevel.heightDp.dp,
                                                 keyGap = preferences.keyGapDp.dp,
                                                 cornerRadius = preferences.cornerRadiusDp.dp,
-                                                onKeyPress = { viewModel.handleKeyPress(it) },
-                                                onShortcut = { name, codes, mods -> viewModel.handleShortcut(name, codes, mods) }
+                                                onKeyPress = { viewModel.handleKeyPress(it) }
                                             )
                                         }
 

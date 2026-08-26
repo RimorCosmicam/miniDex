@@ -73,9 +73,10 @@ fun SpecialRow(
             onTap = { onModifierToggle(ModifierType.ALT) }
         )
 
-        // WIN / Meta Modifier
+        // Meta modifier: Android's META key, presented with the Mac symbol.
         KeyButton(
-            label = "⊞ WIN",
+            label = "⌘",
+            subLabel = "META",
             modifier = Modifier.width(44.dp).height(keyHeight),
             cornerRadius = cornerRadius,
             lockState = modifierState.meta,
