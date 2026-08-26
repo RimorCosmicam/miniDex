@@ -220,7 +220,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 onOpenSettings = { viewModel.setSettingsVisible(true) },
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(start = 28.dp, bottom = 18.dp)
+                    .padding(start = 54.dp, bottom = 24.dp)
             )
 
             if (showSettings) {

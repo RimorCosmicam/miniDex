@@ -325,7 +325,7 @@ fun TouchpadView(
         Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .size(76.dp)
+                .size(84.dp)
                 .onSizeChanged { rightClickHotspotSizePx = it.width }
                 .pointerInteropFilter { event ->
                     val distanceFromCorner = hypot(
