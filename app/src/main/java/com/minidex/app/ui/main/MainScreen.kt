@@ -14,9 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -39,6 +37,7 @@ import com.minidex.app.ui.settings.SettingsView
 import com.minidex.app.ui.theme.LocalMiniDexColors
 import com.minidex.app.ui.theme.AnimatedGifBackground
 import com.minidex.app.ui.theme.MiniDexTheme
+import com.minidex.app.ui.theme.ProceduralThemeBackground
 import com.minidex.app.ui.touchpad.TouchpadView
 
 @Composable
@@ -65,7 +64,8 @@ fun MainScreen(viewModel: MainViewModel) {
 
     MiniDexTheme(
         variant = preferences.themeVariant,
-        accent = preferences.accentColor
+        accent = preferences.accentColor,
+        amoledMode = preferences.amoledMode
     ) {
         val colors = LocalMiniDexColors.current
 
@@ -73,18 +73,28 @@ fun MainScreen(viewModel: MainViewModel) {
             modifier = Modifier
                 .fillMaxSize()
                 .background(colors.background)
-                .statusBarsPadding()
-                .navigationBarsPadding()
                 .padding(horizontal = 4.dp, vertical = 2.dp)
         ) {
-            AnimatedGifBackground(
-                uri = preferences.backgroundGifUri,
-                scale = preferences.backgroundGifScale,
-                offsetX = preferences.backgroundGifOffsetX,
-                offsetY = preferences.backgroundGifOffsetY,
-                opacity = preferences.backgroundGifOpacity,
-                modifier = Modifier.fillMaxSize()
-            )
+            if (!preferences.amoledMode) {
+                if (preferences.backgroundGifUri.isBlank()) {
+                    ProceduralThemeBackground(
+                        variant = preferences.themeVariant,
+                        accent = colors.accent,
+                        filter = preferences.visualFilter,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    AnimatedGifBackground(
+                        uri = preferences.backgroundGifUri,
+                        scale = preferences.backgroundGifScale,
+                        offsetX = preferences.backgroundGifOffsetX,
+                        offsetY = preferences.backgroundGifOffsetY,
+                        opacity = preferences.backgroundGifOpacity,
+                        filter = preferences.visualFilter,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
             Column(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(3.dp)
@@ -216,7 +226,9 @@ fun MainScreen(viewModel: MainViewModel) {
 
             ModeSwitcherButton(
                 currentMode = currentMode,
+                isAmoled = preferences.amoledMode,
                 onToggleMode = { viewModel.toggleAppMode() },
+                onToggleAmoled = { viewModel.toggleAmoledMode() },
                 onOpenSettings = { viewModel.setSettingsVisible(true) },
                 modifier = Modifier
                     .align(Alignment.BottomStart)

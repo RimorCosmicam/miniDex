@@ -16,9 +16,12 @@ val LocalMiniDexColors = staticCompositionLocalOf {
 fun MiniDexTheme(
     variant: ThemeVariant = ThemeVariant.CYBER_OLED,
     accent: AccentColor = AccentColor.NEON_CYAN,
+    amoledMode: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val customColors = getMiniDexColorScheme(variant, accent)
+    val customColors = getMiniDexColorScheme(variant, accent).let {
+        if (amoledMode) it.asAmoled() else it
+    }
 
     val materialColors = darkColorScheme(
         primary = customColors.accent,

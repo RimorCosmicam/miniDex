@@ -96,8 +96,8 @@ fun TouchpadView(
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        colors.surfaceElevated.copy(alpha = 0.5f),
-                        colors.background
+                        colors.surfaceElevated.copy(alpha = 0.42f),
+                        colors.background.copy(alpha = 0.78f)
                     )
                 ),
                 shape
@@ -260,9 +260,19 @@ fun TouchpadView(
                 }
             }
     ) {
-        // Render subtle grid background and touch ripple effects
+        // Quiet geometry gives the full-screen pad depth without instructional clutter.
         Canvas(modifier = Modifier.fillMaxSize()) {
             val now = SystemClock.uptimeMillis()
+
+            drawCircle(
+                brush = Brush.radialGradient(
+                    listOf(colors.accent.copy(alpha = 0.12f), Color.Transparent),
+                    center = Offset(size.width * 0.68f, size.height * 0.42f),
+                    radius = size.maxDimension * 0.62f
+                ),
+                radius = size.maxDimension * 0.62f,
+                center = Offset(size.width * 0.68f, size.height * 0.42f)
+            )
 
             // Subtle center crosshair guide
             drawLine(
@@ -391,27 +401,5 @@ fun TouchpadView(
             }
         }
 
-        // Overlay status indicator
-        Text(
-            text = if (isDragging) "DRAGGING" else "TOUCHPAD",
-            color = if (isDragging) colors.accent else colors.textSecondary.copy(alpha = 0.35f),
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 2.sp,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 8.dp)
-        )
-
-        // Helper gestures hint
-        Text(
-            text = "Corner: Right-click  •  Edge: Scroll  •  2-Finger: Scroll  •  3-Finger: Back",
-            color = colors.textSecondary.copy(alpha = 0.3f),
-            fontSize = 8.sp,
-            fontWeight = FontWeight.Normal,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 8.dp)
-        )
     }
 }

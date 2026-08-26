@@ -5,12 +5,15 @@ import com.minidex.app.domain.model.CursorMode
 import com.minidex.app.domain.model.HapticStrength
 import com.minidex.app.domain.model.KeyHeightLevel
 import com.minidex.app.domain.model.ThemeVariant
+import com.minidex.app.domain.model.VisualFilter
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class UserPreferences(
     val themeVariant: ThemeVariant = ThemeVariant.CYBER_OLED,
     val accentColor: AccentColor = AccentColor.NEON_CYAN,
+    val amoledMode: Boolean = false,
+    val visualFilter: VisualFilter = VisualFilter.NONE,
     val hapticStrength: HapticStrength = HapticStrength.CRISP,
     val keyHeightLevel: KeyHeightLevel = KeyHeightLevel.BALANCED,
     val keyGapDp: Int = 4,

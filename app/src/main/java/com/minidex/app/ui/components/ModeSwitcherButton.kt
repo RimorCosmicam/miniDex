@@ -38,7 +38,9 @@ import com.minidex.app.ui.theme.LocalMiniDexColors
 @OptIn(ExperimentalFoundationApi::class)
 fun ModeSwitcherButton(
     currentMode: AppMode,
+    isAmoled: Boolean,
     onToggleMode: () -> Unit,
+    onToggleAmoled: () -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -47,7 +49,7 @@ fun ModeSwitcherButton(
 
     val shape = RoundedCornerShape(50)
     val bgColor by animateColorAsState(
-        targetValue = if (isKeyboard) colors.accent.copy(alpha = 0.22f) else colors.accent.copy(alpha = 0.35f),
+        targetValue = if (isAmoled) Color.Black else if (isKeyboard) colors.accent.copy(alpha = 0.22f) else colors.accent.copy(alpha = 0.35f),
         label = "switcher_bg"
     )
 
@@ -59,6 +61,7 @@ fun ModeSwitcherButton(
             .border(1.5.dp, colors.accent, shape)
             .combinedClickable(
                 onClick = onToggleMode,
+                onDoubleClick = onToggleAmoled,
                 onLongClick = onOpenSettings
             )
             .padding(horizontal = 14.dp, vertical = 6.dp),

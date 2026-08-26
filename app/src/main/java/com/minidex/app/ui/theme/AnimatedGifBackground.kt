@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
+import com.minidex.app.domain.model.VisualFilter
 import pl.droidsonroids.gif.GifDrawable
 import pl.droidsonroids.gif.GifImageView
 import kotlin.math.max
@@ -16,6 +17,7 @@ fun AnimatedGifBackground(
     offsetX: Float,
     offsetY: Float,
     opacity: Float,
+    filter: VisualFilter = VisualFilter.NONE,
     modifier: Modifier = Modifier
 ) {
     if (uri.isBlank()) return
@@ -37,6 +39,7 @@ fun AnimatedGifBackground(
                 }
             }
             view.alpha = opacity.coerceIn(0f, 1f)
+            view.colorFilter = filter.toAndroidColorFilter()
             view.post {
                 val drawable = view.drawable ?: return@post
                 if (view.width == 0 || view.height == 0) return@post

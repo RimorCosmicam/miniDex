@@ -90,5 +90,31 @@ fun getMiniDexColorScheme(variant: ThemeVariant, accent: AccentColor): MiniDexCo
             textSecondary = Color(0xFFB3A6BC),
             accent = accentCol
         )
+        ThemeVariant.LIQUID_GLASS -> MiniDexColorScheme(
+            background = Color(0xFF07100F),
+            surface = Color(0xFF0D1B19),
+            surfaceElevated = Color(0xFF142724),
+            border = Color(0xFF2B4944),
+            keyBackground = Color(0xCC17302C),
+            keyPressed = Color(0xFF28504A),
+            keyLatched = accentCol.copy(alpha = 0.20f),
+            keyLocked = accentCol.copy(alpha = 0.42f),
+            textPrimary = Color(0xFFF0FAF8),
+            textSecondary = Color(0xFF9BBDB7),
+            accent = accentCol
+        )
     }
 }
+
+fun MiniDexColorScheme.asAmoled(): MiniDexColorScheme = copy(
+    background = Color.Black,
+    surface = Color.Black,
+    surfaceElevated = Color.Black,
+    border = accent.copy(alpha = 0.42f),
+    keyBackground = Color.Black,
+    keyPressed = accent.copy(alpha = 0.22f),
+    keyLatched = accent.copy(alpha = 0.18f),
+    keyLocked = accent.copy(alpha = 0.38f),
+    textPrimary = Color.White,
+    textSecondary = accent.copy(alpha = 0.72f)
+)

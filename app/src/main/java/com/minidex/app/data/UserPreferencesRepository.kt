@@ -15,6 +15,7 @@ import com.minidex.app.domain.model.CursorMode
 import com.minidex.app.domain.model.HapticStrength
 import com.minidex.app.domain.model.KeyHeightLevel
 import com.minidex.app.domain.model.ThemeVariant
+import com.minidex.app.domain.model.VisualFilter
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -25,6 +26,8 @@ class UserPreferencesRepository(private val context: Context) {
     private object Keys {
         val THEME_VARIANT = stringPreferencesKey("theme_variant")
         val ACCENT_COLOR = stringPreferencesKey("accent_color")
+        val AMOLED_MODE = booleanPreferencesKey("amoled_mode")
+        val VISUAL_FILTER = stringPreferencesKey("visual_filter")
         val HAPTIC_STRENGTH = stringPreferencesKey("haptic_strength")
         val KEY_HEIGHT_LEVEL = stringPreferencesKey("key_height_level")
         val KEY_GAP_DP = intPreferencesKey("key_gap_dp")
@@ -60,6 +63,12 @@ class UserPreferencesRepository(private val context: Context) {
                 AccentColor.valueOf(prefs[Keys.ACCENT_COLOR] ?: AccentColor.NEON_CYAN.name)
             } catch (e: Exception) {
                 AccentColor.NEON_CYAN
+            },
+            amoledMode = prefs[Keys.AMOLED_MODE] ?: false,
+            visualFilter = try {
+                VisualFilter.valueOf(prefs[Keys.VISUAL_FILTER] ?: VisualFilter.NONE.name)
+            } catch (_: Exception) {
+                VisualFilter.NONE
             },
             hapticStrength = try {
                 HapticStrength.valueOf(prefs[Keys.HAPTIC_STRENGTH] ?: HapticStrength.CRISP.name)
@@ -111,6 +120,12 @@ class UserPreferencesRepository(private val context: Context) {
                 } catch (e: Exception) {
                     AccentColor.NEON_CYAN
                 },
+                amoledMode = prefs[Keys.AMOLED_MODE] ?: false,
+                visualFilter = try {
+                    VisualFilter.valueOf(prefs[Keys.VISUAL_FILTER] ?: VisualFilter.NONE.name)
+                } catch (_: Exception) {
+                    VisualFilter.NONE
+                },
                 hapticStrength = try {
                     HapticStrength.valueOf(prefs[Keys.HAPTIC_STRENGTH] ?: HapticStrength.CRISP.name)
                 } catch (e: Exception) {
@@ -150,6 +165,8 @@ class UserPreferencesRepository(private val context: Context) {
 
             prefs[Keys.THEME_VARIANT] = updated.themeVariant.name
             prefs[Keys.ACCENT_COLOR] = updated.accentColor.name
+            prefs[Keys.AMOLED_MODE] = updated.amoledMode
+            prefs[Keys.VISUAL_FILTER] = updated.visualFilter.name
             prefs[Keys.HAPTIC_STRENGTH] = updated.hapticStrength.name
             prefs[Keys.KEY_HEIGHT_LEVEL] = updated.keyHeightLevel.name
             prefs[Keys.KEY_GAP_DP] = updated.keyGapDp

@@ -139,6 +139,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         hapticManager.performHaptic(userPreferences.value.hapticStrength)
     }
 
+    fun toggleAmoledMode() {
+        updatePreferences { it.copy(amoledMode = !it.amoledMode) }
+        hapticManager.performHaptic(userPreferences.value.hapticStrength)
+    }
+
     fun setSettingsVisible(visible: Boolean) {
         _showSettings.value = visible
         hapticManager.performHaptic(userPreferences.value.hapticStrength)

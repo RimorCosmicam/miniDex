@@ -5,11 +5,13 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Matrix
+import android.graphics.Paint
 import android.net.Uri
 import android.os.Environment
 import android.provider.MediaStore
 import com.squareup.gifencoder.GifEncoder
 import com.squareup.gifencoder.ImageOptions
+import com.minidex.app.domain.model.VisualFilter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import pl.droidsonroids.gif.GifDrawable
@@ -23,6 +25,7 @@ object GifCropExporter {
         scale: Float,
         offsetX: Float,
         offsetY: Float,
+        filter: VisualFilter = VisualFilter.NONE,
         outputWidth: Int = 720,
         outputHeight: Int = 748
     ): Result<Uri> = withContext(Dispatchers.IO) {
@@ -60,7 +63,10 @@ object GifCropExporter {
                                     (outputHeight - drawable.intrinsicHeight * actualScale) / 2f + offsetY * outputHeight / 2f
                                 )
                             }
-                            Canvas(bitmap).drawBitmap(drawable.currentFrame, matrix, null)
+                            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                colorFilter = filter.toAndroidColorFilter()
+                            }
+                            Canvas(bitmap).drawBitmap(drawable.currentFrame, matrix, paint)
                             val pixels = IntArray(outputWidth * outputHeight)
                             bitmap.getPixels(pixels, 0, outputWidth, 0, 0, outputWidth, outputHeight)
                             val rgb = Array(outputHeight) { row ->

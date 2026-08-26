@@ -38,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,10 +50,12 @@ import com.minidex.app.domain.model.DexDisplayInfo
 import com.minidex.app.domain.model.HapticStrength
 import com.minidex.app.domain.model.KeyHeightLevel
 import com.minidex.app.domain.model.ThemeVariant
+import com.minidex.app.domain.model.VisualFilter
 import com.minidex.app.ui.theme.LocalMiniDexColors
 import com.minidex.app.ui.theme.AnimatedGifBackground
 import com.minidex.app.ui.theme.GifCropExporter
 import com.minidex.app.ui.theme.toColor
+import com.minidex.app.ui.theme.getMiniDexColorScheme
 import kotlinx.coroutines.launch
 
 @Composable
@@ -317,6 +320,55 @@ fun SettingsView(
 
                     SettingsDivider()
 
+                    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text("FILTER", color = colors.textSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            VisualFilter.entries.forEach { filter ->
+                                val selected = filter == preferences.visualFilter
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(50))
+                                        .background(if (selected) colors.accent.copy(alpha = 0.22f) else colors.surfaceElevated)
+                                        .border(1.dp, if (selected) colors.accent else colors.border.copy(alpha = 0.45f), RoundedCornerShape(50))
+                                        .clickable { onUpdatePreferences { it.copy(visualFilter = filter) } }
+                                        .padding(horizontal = 11.dp, vertical = 7.dp)
+                                ) {
+                                    Text(
+                                        filter.displayName,
+                                        color = if (selected) colors.accent else colors.textSecondary,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    SettingsDivider()
+
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("AMOLED", color = colors.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("Double-tap the mode pill", color = colors.textSecondary, fontSize = 9.sp)
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                            Switch(
+                                checked = preferences.amoledMode,
+                                onCheckedChange = { enabled -> onUpdatePreferences { it.copy(amoledMode = enabled) } },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = colors.accent,
+                                    uncheckedTrackColor = colors.surfaceElevated
+                                )
+                            )
+                        }
+                    }
+
+                    SettingsDivider()
+
                     // Two columns keep theme names readable on the narrow cover display.
                     Column(
                         modifier = Modifier
@@ -331,12 +383,21 @@ fun SettingsView(
                             ) {
                                 themes.forEach { theme ->
                                     val isSelected = theme == preferences.themeVariant
+                                    val preview = getMiniDexColorScheme(theme, preferences.accentColor)
                                     Box(
                                         modifier = Modifier
                                             .weight(1f)
-                                            .height(36.dp)
+                                            .height(48.dp)
                                             .clip(RoundedCornerShape(7.dp))
-                                            .background(if (isSelected) colors.accent.copy(alpha = 0.18f) else colors.surfaceElevated)
+                                            .background(
+                                                Brush.linearGradient(
+                                                    listOf(
+                                                        preview.background,
+                                                        preview.keyBackground,
+                                                        preview.accent.copy(alpha = if (isSelected) 0.38f else 0.18f)
+                                                    )
+                                                )
+                                            )
                                             .border(1.dp, if (isSelected) colors.accent else colors.border.copy(alpha = 0.55f), RoundedCornerShape(7.dp))
                                             .clickable { onUpdatePreferences { it.copy(themeVariant = theme) } },
                                         contentAlignment = Alignment.Center
@@ -379,6 +440,7 @@ fun SettingsView(
                                 offsetX = preferences.backgroundGifOffsetX,
                                 offsetY = preferences.backgroundGifOffsetY,
                                 opacity = 1f,
+                                filter = preferences.visualFilter,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -426,7 +488,8 @@ fun SettingsView(
                                         preferences.backgroundGifUri,
                                         preferences.backgroundGifScale,
                                         preferences.backgroundGifOffsetX,
-                                        preferences.backgroundGifOffsetY
+                                        preferences.backgroundGifOffsetY,
+                                        preferences.visualFilter
                                     )
                                     Toast.makeText(
                                         context,

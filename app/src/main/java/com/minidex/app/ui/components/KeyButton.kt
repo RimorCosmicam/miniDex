@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -88,7 +89,15 @@ fun KeyButton(
         modifier = modifier
             .scale(animatedScale)
             .clip(shape)
-            .background(animatedBackground, shape)
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        if (isPressed) colors.accent.copy(alpha = 0.42f) else animatedBackground,
+                        animatedBackground.copy(alpha = 0.86f)
+                    )
+                ),
+                shape
+            )
             .border(1.dp, targetBorder, shape)
             .pointerInput(onTap, onLongPress, onDoubleTap) {
                 detectTapGestures(
