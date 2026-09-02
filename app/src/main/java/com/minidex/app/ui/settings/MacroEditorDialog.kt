@@ -39,6 +39,7 @@ import com.minidex.app.domain.model.ModifierLockState
 import com.minidex.app.domain.model.ModifierType
 import com.minidex.app.ui.components.KeyButton
 import com.minidex.app.ui.theme.LocalMiniDexColors
+import com.minidex.app.ui.theme.Mont
 
 @Composable
 fun MacroEditorDialog(
@@ -80,27 +81,16 @@ fun MacroEditorDialog(
         .map { it.second } + listOfNotNull(selectedKey?.first))
         .joinToString(" + ")
 
-    val shape = RoundedCornerShape(12.dp)
-
     Dialog(onDismissRequest = onDismiss) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(shape)
-                .background(colors.surfaceElevated, shape)
-                .border(1.dp, colors.accent, shape)
-                .padding(12.dp)
+                .background(colors.surface)
+                .padding(start = 22.dp, end = 14.dp, top = 14.dp, bottom = 14.dp)
         ) {
             Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(9.dp)
             ) {
-                Text(
-                    text = "CREATE CUSTOM MACRO",
-                    color = colors.accent,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
-
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -112,7 +102,7 @@ fun MacroEditorDialog(
                         focusedTextColor = colors.textPrimary,
                         unfocusedTextColor = colors.textPrimary
                     ),
-                    textStyle = TextStyle(fontSize = 11.sp),
+                    textStyle = TextStyle(fontFamily = Mont, fontWeight = FontWeight.Black, fontSize = 11.sp),
                     modifier = Modifier.fillMaxWidth().height(48.dp)
                 )
 
@@ -131,10 +121,12 @@ fun MacroEditorDialog(
 
                 if (selectedType == "CHORD") {
                     Text(
-                        text = chordLabel.ifEmpty { "Tap modifiers, then tap a key" },
-                        color = if (chordLabel.isEmpty()) colors.textSecondary else colors.accent,
+                        text = chordLabel.ifEmpty { "TAP MODIFIERS, THEN A KEY" },
+                        color = if (chordLabel.isEmpty()) colors.textExplain else Color.White,
+                        fontFamily = Mont,
+                        fontWeight = FontWeight.Black,
                         fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
+                        letterSpacing = 0.5.sp
                     )
 
                     Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -147,7 +139,6 @@ fun MacroEditorDialog(
                                     ModifierLockState.INACTIVE
                                 },
                                 modifier = Modifier.weight(1f).height(36.dp),
-                                cornerRadius = 7.dp,
                                 onTap = {
                                     selectedModifiers = if (modifier in selectedModifiers) {
                                         selectedModifiers - modifier
@@ -175,7 +166,6 @@ fun MacroEditorDialog(
                                 },
                                 modifier = Modifier.width(if (key.first.length > 2) 58.dp else 40.dp)
                                     .height(38.dp),
-                                cornerRadius = 7.dp,
                                 onTap = { selectedKey = key }
                             )
                         }
@@ -192,7 +182,7 @@ fun MacroEditorDialog(
                             focusedTextColor = colors.textPrimary,
                             unfocusedTextColor = colors.textPrimary
                         ),
-                        textStyle = TextStyle(fontSize = 11.sp),
+                        textStyle = TextStyle(fontFamily = Mont, fontWeight = FontWeight.Black, fontSize = 11.sp),
                         modifier = Modifier.fillMaxWidth().height(48.dp)
                     )
                 }
@@ -203,19 +193,22 @@ fun MacroEditorDialog(
                 ) {
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
                             .clickable { onDismiss() }
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                            .padding(horizontal = 10.dp, vertical = 7.dp)
                     ) {
-                        Text(text = "Cancel", color = colors.textSecondary, fontSize = 10.sp)
+                        Text(
+                            text = "CANCEL",
+                            color = colors.textSecondary,
+                            fontFamily = Mont,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 14.sp
+                        )
                     }
 
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(14.dp))
 
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(colors.accent)
                             .clickable {
                                 val canSave = name.isNotBlank() &&
                                     ((selectedType == "CHORD" && selectedKey != null) ||
@@ -249,13 +242,14 @@ fun MacroEditorDialog(
                                     onDismiss()
                                 }
                             }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .padding(horizontal = 10.dp, vertical = 7.dp)
                     ) {
                         Text(
-                            text = "Save",
-                            color = Color.Black,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
+                            text = "DONE",
+                            color = Color.White,
+                            fontFamily = Mont,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 14.sp
                         )
                     }
                 }
@@ -273,16 +267,16 @@ private fun MacroTypePill(
     val colors = LocalMiniDexColors.current
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(50))
-            .background(if (selected) colors.accent else colors.keyBackground)
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .padding(horizontal = 6.dp, vertical = 7.dp)
     ) {
         Text(
             text = label,
-            color = if (selected) Color.Black else colors.textSecondary,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Bold
+            color = if (selected) Color.White else colors.textSecondary,
+            fontFamily = Mont,
+            fontWeight = FontWeight.Black,
+            fontSize = 11.sp,
+            letterSpacing = 0.5.sp
         )
     }
 }

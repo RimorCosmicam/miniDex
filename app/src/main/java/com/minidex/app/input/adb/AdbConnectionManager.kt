@@ -139,6 +139,17 @@ class AdbConnectionManager(
         } catch (_: Throwable) {}
     }
 
+    /**
+     * True once pairing has produced a key and certificate on disk. From then on adbd trusts this
+     * device, so connecting needs only the advertised port — never another six-digit code.
+     */
+    fun hasStoredCredentials(): Boolean {
+        val files = context.filesDir
+        return File(files, "minidex_adb.priv").exists() &&
+            File(files, "minidex_adb.pub").exists() &&
+            File(files, "minidex_adb.crt").exists()
+    }
+
     fun checkShizukuStatus(): Boolean {
         return try {
             val ping = Shizuku.pingBinder()
@@ -184,6 +195,9 @@ class AdbConnectionManager(
     }
 
     fun openWirelessDebuggingSettings() {
+        // One UI has no activity for the wireless debugging screen itself — it is a preference
+        // inside Developer options — so the dedicated intents are tried first for the builds that
+        // do have them, and Developer options is the honest landing place everywhere else.
         val intents = listOf(
             Intent().setClassName(
                 "com.android.settings",

@@ -20,7 +20,6 @@ import com.minidex.app.ui.theme.LocalMiniDexColors
 fun NavKeyboard(
     keyHeight: Dp = 42.dp,
     keyGap: Dp = 3.dp,
-    cornerRadius: Dp = 8.dp,
     onKeyPress: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -60,7 +59,6 @@ fun NavKeyboard(
                     modifier = Modifier
                         .padding(horizontal = 1.dp)
                         .height(keyHeight),
-                    cornerRadius = cornerRadius,
                     onTap = { onKeyPress(code) }
                 )
             }
@@ -74,39 +72,32 @@ fun NavKeyboard(
             KeyButton(
                 label = "HOME",
                 modifier = Modifier.weight(1f).height(keyHeight),
-                cornerRadius = cornerRadius,
                 onTap = { onKeyPress(KeyEvent.KEYCODE_MOVE_HOME) }
             )
             KeyButton(
                 label = "END",
                 modifier = Modifier.weight(1f).height(keyHeight),
-                cornerRadius = cornerRadius,
                 onTap = { onKeyPress(KeyEvent.KEYCODE_MOVE_END) }
             )
             KeyButton(
                 label = "PG UP",
                 modifier = Modifier.weight(1f).height(keyHeight),
-                cornerRadius = cornerRadius,
                 onTap = { onKeyPress(KeyEvent.KEYCODE_PAGE_UP) }
             )
             KeyButton(
                 label = "PG DN",
                 modifier = Modifier.weight(1f).height(keyHeight),
-                cornerRadius = cornerRadius,
                 onTap = { onKeyPress(KeyEvent.KEYCODE_PAGE_DOWN) }
             )
             KeyButton(
                 label = "BACK",
                 modifier = Modifier.weight(0.9f).height(keyHeight),
-                cornerRadius = cornerRadius,
                 onTap = { onKeyPress(KeyEvent.KEYCODE_BACK) }
             )
             KeyButton(
                 label = "SCREEN",
                 subLabel = "Shot",
                 modifier = Modifier.weight(1.1f).height(keyHeight),
-                cornerRadius = cornerRadius,
-                accentColor = colors.accent,
                 onTap = { onKeyPress(KeyEvent.KEYCODE_SYSRQ) }
             )
         }
@@ -120,7 +111,6 @@ fun NavKeyboard(
             KeyButton(
                 label = "RECENTS",
                 modifier = Modifier.weight(1.3f).height(keyHeight),
-                cornerRadius = cornerRadius,
                 onTap = { onKeyPress(KeyEvent.KEYCODE_APP_SWITCH) }
             )
 
@@ -128,25 +118,21 @@ fun NavKeyboard(
             KeyButton(
                 label = "←",
                 modifier = Modifier.weight(1f).height(keyHeight),
-                cornerRadius = cornerRadius,
                 onTap = { onKeyPress(KeyEvent.KEYCODE_DPAD_LEFT) }
             )
             KeyButton(
                 label = "↑",
                 modifier = Modifier.weight(1f).height(keyHeight),
-                cornerRadius = cornerRadius,
                 onTap = { onKeyPress(KeyEvent.KEYCODE_DPAD_UP) }
             )
             KeyButton(
                 label = "↓",
                 modifier = Modifier.weight(1f).height(keyHeight),
-                cornerRadius = cornerRadius,
                 onTap = { onKeyPress(KeyEvent.KEYCODE_DPAD_DOWN) }
             )
             KeyButton(
                 label = "→",
                 modifier = Modifier.weight(1f).height(keyHeight),
-                cornerRadius = cornerRadius,
                 onTap = { onKeyPress(KeyEvent.KEYCODE_DPAD_RIGHT) }
             )
 
@@ -154,8 +140,6 @@ fun NavKeyboard(
             KeyButton(
                 label = "HOME",
                 modifier = Modifier.weight(1.2f).height(keyHeight),
-                cornerRadius = cornerRadius,
-                accentColor = colors.accent,
                 onTap = { onKeyPress(KeyEvent.KEYCODE_HOME) }
             )
         }

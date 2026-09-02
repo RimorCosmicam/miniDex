@@ -44,13 +44,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.minidex.app.domain.model.Macro
 import com.minidex.app.ui.theme.LocalMiniDexColors
+import com.minidex.app.ui.theme.Mont
 
 @Composable
 fun MacropadView(
     macros: List<Macro>,
     onExecuteMacro: (Macro) -> Unit,
     onAddMacroClick: () -> Unit,
-    cornerRadius: Dp = 10.dp,
     modifier: Modifier = Modifier
 ) {
     val colors = LocalMiniDexColors.current
@@ -66,20 +66,16 @@ fun MacropadView(
             items(macros, key = { it.id }) { macro ->
                 MacroGridItem(
                     macro = macro,
-                    cornerRadius = cornerRadius,
                     onTap = { onExecuteMacro(macro) }
                 )
             }
 
             // Add Custom Macro Button
             item {
-                val shape = RoundedCornerShape(cornerRadius)
                 Box(
                     modifier = Modifier
                         .height(54.dp)
-                        .clip(shape)
-                        .background(colors.surfaceElevated, shape)
-                        .border(1.dp, colors.border.copy(alpha = 0.6f), shape)
+                        .background(colors.surface)
                         .clickable { onAddMacroClick() },
                     contentAlignment = Alignment.Center
                 ) {
@@ -94,10 +90,12 @@ fun MacropadView(
                             modifier = Modifier.size(16.dp)
                         )
                         Text(
-                            text = "New Macro",
+                            text = "NEW MACRO",
                             color = colors.textSecondary,
+                            fontFamily = Mont,
+                            fontWeight = FontWeight.Black,
                             fontSize = 8.sp,
-                            fontWeight = FontWeight.Medium
+                            letterSpacing = 0.5.sp
                         )
                     }
                 }
@@ -109,16 +107,14 @@ fun MacropadView(
 @Composable
 fun MacroGridItem(
     macro: Macro,
-    cornerRadius: Dp,
     onTap: () -> Unit
 ) {
     val colors = LocalMiniDexColors.current
-    val shape = RoundedCornerShape(cornerRadius)
 
     val itemAccentColor = try {
         Color(android.graphics.Color.parseColor(macro.colorHex))
     } catch (e: Exception) {
-        colors.accent
+        Color.White
     }
 
     val iconVector = when (macro.iconName) {
@@ -137,9 +133,7 @@ fun MacroGridItem(
     Box(
         modifier = Modifier
             .height(54.dp)
-            .clip(shape)
-            .background(colors.keyBackground, shape)
-            .border(1.dp, itemAccentColor.copy(alpha = 0.5f), shape)
+            .background(colors.keyBackground)
             .clickable { onTap() }
             .padding(horizontal = 4.dp, vertical = 3.dp),
         contentAlignment = Alignment.Center
@@ -161,10 +155,11 @@ fun MacroGridItem(
                 )
                 Spacer(modifier = Modifier.size(4.dp))
                 Text(
-                    text = macro.name,
+                    text = macro.name.uppercase(),
                     color = colors.textPrimary,
+                    fontFamily = Mont,
+                    fontWeight = FontWeight.Black,
                     fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
                     maxLines = 1
                 )
             }
@@ -172,9 +167,10 @@ fun MacroGridItem(
             if (macro.description.isNotEmpty()) {
                 Text(
                     text = macro.description,
-                    color = colors.textSecondary,
+                    color = colors.textExplain,
+                    fontFamily = Mont,
+                    fontWeight = FontWeight.Black,
                     fontSize = 7.sp,
-                    fontWeight = FontWeight.Normal,
                     maxLines = 1,
                     lineHeight = 8.sp
                 )

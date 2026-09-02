@@ -5,21 +5,19 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
-import com.minidex.app.domain.model.AccentColor
-import com.minidex.app.domain.model.ThemeVariant
+import com.minidex.app.domain.model.HalftoneColorway
 
 val LocalMiniDexColors = staticCompositionLocalOf {
-    getMiniDexColorScheme(ThemeVariant.CYBER_OLED, AccentColor.NEON_CYAN)
+    getMiniDexColorScheme(HalftoneColorway.MUSTARD)
 }
 
 @Composable
 fun MiniDexTheme(
-    variant: ThemeVariant = ThemeVariant.CYBER_OLED,
-    accent: AccentColor = AccentColor.NEON_CYAN,
+    colorway: HalftoneColorway = HalftoneColorway.MUSTARD,
     amoledMode: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val customColors = getMiniDexColorScheme(variant, accent).let {
+    val customColors = getMiniDexColorScheme(colorway).let {
         if (amoledMode) it.asAmoled() else it
     }
 

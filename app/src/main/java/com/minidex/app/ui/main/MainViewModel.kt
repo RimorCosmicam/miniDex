@@ -1,6 +1,8 @@
 package com.minidex.app.ui.main
 
+import android.app.ActivityOptions
 import android.app.Application
+import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.minidex.app.data.MacroRepository
@@ -52,6 +54,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val activeBackend: StateFlow<InputBackend> = backendManager.activeBackend
     val isAdbConnected: StateFlow<Boolean> = backendManager.isAdbConnected
     val isAccessibilityEnabled: StateFlow<Boolean> = backendManager.isAccessibilityEnabled
+    val isAccessibilityConfigured: StateFlow<Boolean> = backendManager.isAccessibilityConfigured
     val isImeEnabled: StateFlow<Boolean> = backendManager.isImeEnabled
 
     // ADB States
@@ -64,7 +67,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _showAdbPairingDialog = MutableStateFlow(false)
     val showAdbPairingDialog: StateFlow<Boolean> = _showAdbPairingDialog.asStateFlow()
 
-    private val _currentMode = MutableStateFlow(AppMode.KEYBOARD)
+    private val _currentMode = MutableStateFlow(AppMode.TOUCHPAD)
     val currentMode: StateFlow<AppMode> = _currentMode.asStateFlow()
 
     private val _currentPage = MutableStateFlow(KeyboardPage.ABC)
@@ -78,6 +81,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _showSettings = MutableStateFlow(false)
     val showSettings: StateFlow<Boolean> = _showSettings.asStateFlow()
+
+    /**
+     * The pairing code, held here rather than in the sheet, because it is typed into a floating
+     * overlay window that is a separate composition from the app's own.
+     */
+    private val _pairingCode = MutableStateFlow("")
+    val pairingCode: StateFlow<String> = _pairingCode.asStateFlow()
+
+    private val _pairingPort = MutableStateFlow("")
+    val pairingPort: StateFlow<String> = _pairingPort.asStateFlow()
+
+    /** The display MiniDex was on when it stepped aside for Settings, so it can come back to it. */
+    private var pairingDisplayId: Int = 0
+
+    fun setPairingDisplay(displayId: Int) {
+        pairingDisplayId = displayId
+    }
+
+    private val _showPairingOverlay = MutableStateFlow(false)
+    val showPairingOverlay: StateFlow<Boolean> = _showPairingOverlay.asStateFlow()
+
+    /** A codeless reconnect that did not take. Silent failure here reads as a dead button. */
+    private val _autoPairFailed = MutableStateFlow(false)
+    val autoPairFailed: StateFlow<Boolean> = _autoPairFailed.asStateFlow()
+
+    /**
+     * Dismissed for this run only. Onboarding still opens whenever a driver is missing, but it is
+     * a starting point rather than a locked door: the drivers can be set up later.
+     */
+    private val _onboardingDismissed = MutableStateFlow(false)
+    val onboardingDismissed: StateFlow<Boolean> = _onboardingDismissed.asStateFlow()
+
+
 
     private val targetDisplayId: Int
         get() {
@@ -305,13 +341,75 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Asks for the pairing strip. Nothing is opened yet: the screen it has to float over is only
+     * worth going to once the strip is actually up, or it is a one-way trip to Developer options
+     * with nowhere left to type.
+     */
+    fun requestPairing() {
+        _pairingCode.value = ""
+        _pairingPort.value = ""
+        _showPairingOverlay.value = true
+    }
+
+    /** Called once the strip is floating, to bring up the screen carrying the code. */
     fun openWirelessDebuggingSettings() {
         backendManager.openWirelessDebuggingSettings()
+    }
+
+    fun setPairingCode(code: String) {
+        _pairingCode.value = code.filter { it.isDigit() }.take(6)
+    }
+
+    fun setPairingPort(port: String) {
+        _pairingPort.value = port.filter { it.isDigit() }.take(5)
+    }
+
+    fun dismissPairingOverlay() {
+        _showPairingOverlay.value = false
+    }
+
+    fun pairWithEnteredCode() {
+        val port = _pairingPort.value.toIntOrNull() ?: discoveredPairingPort.value ?: return
+        val code = _pairingCode.value
+        if (code.length != 6) return
+        viewModelScope.launch {
+            val result = backendManager.adbManager.pairWithCode(port, code)
+            if (result.isSuccess) {
+                updatePreferences { it.copy(adbPairedBefore = true) }
+                _showPairingOverlay.value = false
+                _showAdbPairingDialog.value = false
+                _pairingCode.value = ""
+                // Settings was only ever a place to read a number off. Once it has been read,
+                // come back rather than leaving the app buried behind Developer options.
+                returnToApp()
+            }
+        }
     }
 
     fun pairAdbWithCode(port: Int, code: String) {
         viewModelScope.launch {
             backendManager.adbManager.pairWithCode(port, code)
+        }
+    }
+
+    /** True when a codeless reconnect is possible: keys on disk and a port being advertised. */
+    fun canAutoPair(): Boolean =
+        userPreferences.value.adbPairedBefore &&
+            backendManager.adbManager.hasStoredCredentials() &&
+            discoveredConnectPort.value != null
+
+    /** Reconnects on the stored key, with no pairing code. */
+    fun autoPairAdb() {
+        val port = discoveredConnectPort.value ?: run {
+            _autoPairFailed.value = true
+            return
+        }
+        _autoPairFailed.value = false
+        viewModelScope.launch {
+            val host = backendManager.adbManager.mdnsDiscovery.discoveredHost.value
+            val result = backendManager.adbManager.connect(host, port)
+            _autoPairFailed.value = result.getOrDefault(false) != true
         }
     }
 
@@ -343,6 +441,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun launchSamsungDexTouchpad() {
         backendManager.launchSamsungDexTouchpad()
+    }
+
+    fun completeOnboarding() {
+        _onboardingDismissed.value = true
+        updatePreferences { it.copy(onboardingComplete = true) }
+    }
+
+    /** Brings MiniDex back to the front, on the display it was showing on. */
+    private fun returnToApp() {
+        val context = getApplication<Application>()
+        val intent = Intent(context, MainCoverActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
+                Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val options = ActivityOptions.makeBasic().apply {
+            runCatching { launchDisplayId = pairingDisplayId }
+        }
+        runCatching { context.startActivity(intent, options.toBundle()) }
+            .onFailure { runCatching { context.startActivity(intent) } }
     }
 
     fun refreshBackend() {

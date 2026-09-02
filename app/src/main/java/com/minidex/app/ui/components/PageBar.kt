@@ -1,7 +1,6 @@
 package com.minidex.app.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,19 +8,23 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.minidex.app.domain.model.KeyboardPage
 import com.minidex.app.ui.theme.LocalMiniDexColors
+import com.minidex.app.ui.theme.Mont
 
+/**
+ * The page row. Selected is simply the bright one — no fill, no border, no underline.
+ *
+ * The connection mark leads the row and carries the only colour on it: green when the driver is
+ * live, red when it is not. That is a state, which is the one thing an accent is allowed to be.
+ */
 @Composable
 fun PageBar(
     currentPage: KeyboardPage,
@@ -41,61 +44,24 @@ fun PageBar(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Wireless ADB status
-        val adbShape = RoundedCornerShape(6.dp)
-        Box(
-            modifier = Modifier
-                .height(26.dp)
-                .clip(adbShape)
-                .background(
-                    if (isAdbConnected) Color(0xFF00E676).copy(alpha = 0.2f) else colors.surfaceElevated,
-                    adbShape
-                )
-                .border(
-                    1.dp,
-                    if (isAdbConnected) Color(0xFF00E676).copy(alpha = 0.7f) else colors.border.copy(alpha = 0.4f),
-                    adbShape
-                )
-                .clickable { onAdbBadgeClick() }
-                .padding(horizontal = 6.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = if (isAdbConnected) "ADB ✓" else "ADB",
-                color = if (isAdbConnected) Color(0xFF00E676) else colors.textSecondary,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.2.sp
-            )
-        }
-
         pages.forEach { page ->
             val isSelected = page == currentPage
-            val shape = RoundedCornerShape(6.dp)
 
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .height(26.dp)
-                    .clip(shape)
-                    .background(
-                        if (isSelected) colors.accent.copy(alpha = 0.2f) else colors.surfaceElevated,
-                        shape
-                    )
-                    .border(
-                        1.dp,
-                        if (isSelected) colors.accent else colors.border.copy(alpha = 0.4f),
-                        shape
-                    )
+                    .background(colors.keyBackground)
                     .clickable { onPageSelected(page) },
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = page.title,
-                    color = if (isSelected) colors.accent else colors.textSecondary,
+                    color = if (isSelected) androidx.compose.ui.graphics.Color.White else colors.textSecondary,
+                    fontFamily = Mont,
+                    fontWeight = FontWeight.Black,
                     fontSize = 10.sp,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                    letterSpacing = 0.3.sp
+                    letterSpacing = 0.5.sp
                 )
             }
         }

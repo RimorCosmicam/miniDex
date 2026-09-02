@@ -1,17 +1,14 @@
 package com.minidex.app.ui.components
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -20,18 +17,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.minidex.app.domain.model.ModifierLockState
 import com.minidex.app.ui.theme.LocalMiniDexColors
+import com.minidex.app.ui.theme.Mont
 
+/**
+ * A key under Mont: 92% black, square, borderless.
+ *
+ * The held key is simply lightened by 30% white — no scale, no gradient, no glow. A latched or
+ * locked modifier is the bright one rather than the boxed one, so the state lives in the type:
+ * white at full strength when latched, the accent when locked, and a bare word above it saying
+ * which. Every other keyboard theme uses gradients and rounded borders; this one does not, and
+ * that is the point of it.
+ */
 @Composable
 fun KeyButton(
     label: String,
@@ -41,7 +44,6 @@ fun KeyButton(
     lockState: ModifierLockState = ModifierLockState.INACTIVE,
     accentColor: Color? = null,
     customBackgroundColor: Color? = null,
-    cornerRadius: Dp = 8.dp,
     onTap: () -> Unit,
     onLongPress: (() -> Unit)? = null,
     onDoubleTap: (() -> Unit)? = null
@@ -59,46 +61,22 @@ fun KeyButton(
         else -> colors.keyBackground
     }
 
-    val targetBorder = when {
-        isLocked -> colors.accent
-        isLatched -> colors.accent.copy(alpha = 0.8f)
-        accentColor != null -> accentColor.copy(alpha = 0.5f)
-        else -> colors.border.copy(alpha = 0.6f)
-    }
-
     val textColor = when {
-        isLocked -> Color.White
-        isLatched -> colors.accent
+        isLocked -> colors.accent
+        isLatched -> Color.White
         accentColor != null -> accentColor
         else -> colors.textPrimary
     }
 
-    val shape = RoundedCornerShape(cornerRadius)
     val animatedBackground by animateColorAsState(
-        targetValue = if (isPressed) colors.accent.copy(alpha = 0.34f) else targetBg,
+        targetValue = if (isPressed) colors.keyPressed else targetBg,
         animationSpec = tween(70),
         label = "key_background"
-    )
-    val animatedScale by animateFloatAsState(
-        targetValue = if (isPressed) 0.94f else 1f,
-        animationSpec = tween(70),
-        label = "key_scale"
     )
 
     Box(
         modifier = modifier
-            .scale(animatedScale)
-            .clip(shape)
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        if (isPressed) colors.accent.copy(alpha = 0.42f) else animatedBackground,
-                        animatedBackground.copy(alpha = 0.86f)
-                    )
-                ),
-                shape
-            )
-            .border(1.dp, targetBorder, shape)
+            .background(animatedBackground)
             .pointerInput(onTap, onLongPress, onDoubleTap) {
                 detectTapGestures(
                     onPress = {
@@ -123,12 +101,23 @@ fun KeyButton(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            if (shiftLabel != null) {
+            if (isLatched || isLocked) {
+                Text(
+                    text = if (isLocked) "LOCK" else "ON",
+                    color = if (isLocked) colors.accent else Color.White,
+                    fontFamily = Mont,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 7.sp,
+                    lineHeight = 8.sp,
+                    letterSpacing = 0.5.sp
+                )
+            } else if (shiftLabel != null) {
                 Text(
                     text = shiftLabel,
                     color = colors.textSecondary,
+                    fontFamily = Mont,
+                    fontWeight = FontWeight.Black,
                     fontSize = 8.sp,
-                    fontWeight = FontWeight.Normal,
                     lineHeight = 9.sp
                 )
             }
@@ -136,38 +125,20 @@ fun KeyButton(
             Text(
                 text = label,
                 color = textColor,
+                fontFamily = Mont,
+                fontWeight = FontWeight.Black,
                 fontSize = if (label.length > 2) 11.sp else 14.sp,
-                fontWeight = if (isLocked || isLatched) FontWeight.ExtraBold else FontWeight.Bold,
                 lineHeight = 15.sp
             )
 
             if (subLabel != null) {
                 Text(
                     text = subLabel,
-                    color = colors.textSecondary.copy(alpha = 0.8f),
-                    fontSize = 7.sp,
-                    fontWeight = FontWeight.Normal,
-                    lineHeight = 8.sp
-                )
-            }
-        }
-
-        // Indicator dot for latched / locked modifier state
-        if (isLatched || isLocked) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(3.dp)
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(if (isLocked) colors.accent else colors.accent.copy(alpha = 0.7f))
-                    .padding(horizontal = 3.dp, vertical = 1.dp)
-            ) {
-                Text(
-                    text = if (isLocked) "LOCK" else "ON",
-                    color = Color.Black,
-                    fontSize = 6.sp,
+                    color = colors.textSecondary,
+                    fontFamily = Mont,
                     fontWeight = FontWeight.Black,
-                    lineHeight = 7.sp
+                    fontSize = 7.sp,
+                    lineHeight = 8.sp
                 )
             }
         }

@@ -17,7 +17,6 @@ import com.minidex.app.ui.theme.LocalMiniDexColors
 fun SymbolKeyboard(
     keyHeight: Dp = 44.dp,
     keyGap: Dp = 3.dp,
-    cornerRadius: Dp = 8.dp,
     onCharPress: (Char, Int) -> Unit,
     onKeyPress: (Int) -> Unit,
     modifier: Modifier = Modifier
@@ -89,7 +88,6 @@ fun SymbolKeyboard(
                 KeyButton(
                     label = char.toString(),
                     modifier = Modifier.weight(1f).height(keyHeight),
-                    cornerRadius = cornerRadius,
                     onTap = { onCharPress(char, keyCode) }
                 )
             }
@@ -104,7 +102,6 @@ fun SymbolKeyboard(
                 KeyButton(
                     label = char.toString(),
                     modifier = Modifier.weight(1f).height(keyHeight),
-                    cornerRadius = cornerRadius,
                     onTap = { onCharPress(char, keyCode) }
                 )
             }
@@ -119,7 +116,6 @@ fun SymbolKeyboard(
                 KeyButton(
                     label = char.toString(),
                     modifier = Modifier.weight(1f).height(keyHeight),
-                    cornerRadius = cornerRadius,
                     onTap = { onCharPress(char, keyCode) }
                 )
             }
@@ -134,7 +130,6 @@ fun SymbolKeyboard(
                 KeyButton(
                     label = char.toString(),
                     modifier = Modifier.weight(1f).height(keyHeight),
-                    cornerRadius = cornerRadius,
                     onTap = { onCharPress(char, keyCode) }
                 )
             }
@@ -142,15 +137,12 @@ fun SymbolKeyboard(
             KeyButton(
                 label = "␣",
                 modifier = Modifier.weight(2f).height(keyHeight),
-                cornerRadius = cornerRadius,
                 onTap = { onKeyPress(KeyEvent.KEYCODE_SPACE) }
             )
 
             KeyButton(
                 label = "↵",
                 modifier = Modifier.weight(1.5f).height(keyHeight),
-                cornerRadius = cornerRadius,
-                accentColor = colors.accent,
                 onTap = { onKeyPress(KeyEvent.KEYCODE_ENTER) }
             )
         }

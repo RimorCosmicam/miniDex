@@ -48,8 +48,20 @@ class InputBackendManager(
     private val _isAdbConnected = MutableStateFlow(false)
     val isAdbConnected: StateFlow<Boolean> = _isAdbConnected.asStateFlow()
 
+    /**
+     * Whether the service is actually bound and running — not merely listed in Settings.
+     *
+     * Those are different states and only one of them is useful: replacing the APK leaves the
+     * component in `enabled_accessibility_services` while Android drops the binding, so the setting
+     * reads on while nothing is running. Gestures do not dispatch and the pairing panel has no
+     * window to attach to, so anything that says "on" from the settings string alone is lying.
+     */
     private val _isAccessibilityEnabled = MutableStateFlow(false)
     val isAccessibilityEnabled: StateFlow<Boolean> = _isAccessibilityEnabled.asStateFlow()
+
+    /** Listed in Settings, whether or not it is currently bound. */
+    private val _isAccessibilityConfigured = MutableStateFlow(false)
+    val isAccessibilityConfigured: StateFlow<Boolean> = _isAccessibilityConfigured.asStateFlow()
 
     private val _isImeEnabled = MutableStateFlow(false)
     val isImeEnabled: StateFlow<Boolean> = _isImeEnabled.asStateFlow()
@@ -120,9 +132,8 @@ class InputBackendManager(
         }
     }
 
+    /** Listed in Settings. Says nothing about whether it is bound. */
     private fun checkAccessibilityServiceConfigured(): Boolean {
-        if (MiniDexAccessibilityService.isServiceEnabled()) return true
-
         val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager ?: return false
         val enabledServices = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
         val packageName = context.packageName
@@ -142,16 +153,18 @@ class InputBackendManager(
 
     suspend fun refreshBackend() {
         val adbActive = adbBackend.isAvailable
-        val a11yActive = checkAccessibilityServiceConfigured()
+        val a11yRunning = MiniDexAccessibilityService.isServiceEnabled()
+        val a11yConfigured = a11yRunning || checkAccessibilityServiceConfigured()
         val imeActive = checkImeConfigured()
 
         _isAdbConnected.value = adbActive
-        _isAccessibilityEnabled.value = a11yActive
+        _isAccessibilityEnabled.value = a11yRunning
+        _isAccessibilityConfigured.value = a11yConfigured
         _isImeEnabled.value = imeActive
 
         val candidate: InputBackend = when {
             adbActive -> adbBackend
-            a11yActive -> accessibilityBackend
+            a11yRunning -> accessibilityBackend
             else -> fallbackBackend
         }
 

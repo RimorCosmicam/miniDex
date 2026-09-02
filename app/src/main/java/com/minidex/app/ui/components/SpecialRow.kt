@@ -16,21 +16,19 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.minidex.app.domain.model.ModifierState
 import com.minidex.app.domain.model.ModifierType
-import com.minidex.app.ui.theme.LocalMiniDexColors
 
 @Composable
 fun SpecialRow(
+    modifier: Modifier = Modifier,
     modifierState: ModifierState,
-    cornerRadius: Dp = 6.dp,
     keyHeight: Dp = 32.dp,
     onModifierToggle: (ModifierType) -> Unit,
     onKeyPress: (Int) -> Unit
 ) {
     val scrollState = rememberScrollState()
-    val colors = LocalMiniDexColors.current
 
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(keyHeight)
             .horizontalScroll(scrollState)
@@ -42,8 +40,6 @@ fun SpecialRow(
         KeyButton(
             label = "ESC",
             modifier = Modifier.width(38.dp).height(keyHeight),
-            cornerRadius = cornerRadius,
-            accentColor = colors.accent,
             onTap = { onKeyPress(KeyEvent.KEYCODE_ESCAPE) }
         )
 
@@ -51,7 +47,6 @@ fun SpecialRow(
         KeyButton(
             label = "TAB",
             modifier = Modifier.width(36.dp).height(keyHeight),
-            cornerRadius = cornerRadius,
             onTap = { onKeyPress(KeyEvent.KEYCODE_TAB) }
         )
 
@@ -59,7 +54,6 @@ fun SpecialRow(
         KeyButton(
             label = "CTRL",
             modifier = Modifier.width(40.dp).height(keyHeight),
-            cornerRadius = cornerRadius,
             lockState = modifierState.ctrl,
             onTap = { onModifierToggle(ModifierType.CTRL) }
         )
@@ -68,7 +62,6 @@ fun SpecialRow(
         KeyButton(
             label = "ALT",
             modifier = Modifier.width(36.dp).height(keyHeight),
-            cornerRadius = cornerRadius,
             lockState = modifierState.alt,
             onTap = { onModifierToggle(ModifierType.ALT) }
         )
@@ -78,7 +71,6 @@ fun SpecialRow(
             label = "⌘",
             subLabel = "META",
             modifier = Modifier.width(44.dp).height(keyHeight),
-            cornerRadius = cornerRadius,
             lockState = modifierState.meta,
             onTap = { onModifierToggle(ModifierType.META) }
         )
@@ -87,7 +79,6 @@ fun SpecialRow(
         KeyButton(
             label = "DEL",
             modifier = Modifier.width(36.dp).height(keyHeight),
-            cornerRadius = cornerRadius,
             onTap = { onKeyPress(KeyEvent.KEYCODE_FORWARD_DEL) }
         )
 
@@ -95,25 +86,21 @@ fun SpecialRow(
         KeyButton(
             label = "↑",
             modifier = Modifier.width(32.dp).height(keyHeight),
-            cornerRadius = cornerRadius,
             onTap = { onKeyPress(KeyEvent.KEYCODE_DPAD_UP) }
         )
         KeyButton(
             label = "↓",
             modifier = Modifier.width(32.dp).height(keyHeight),
-            cornerRadius = cornerRadius,
             onTap = { onKeyPress(KeyEvent.KEYCODE_DPAD_DOWN) }
         )
         KeyButton(
             label = "←",
             modifier = Modifier.width(32.dp).height(keyHeight),
-            cornerRadius = cornerRadius,
             onTap = { onKeyPress(KeyEvent.KEYCODE_DPAD_LEFT) }
         )
         KeyButton(
             label = "→",
             modifier = Modifier.width(32.dp).height(keyHeight),
-            cornerRadius = cornerRadius,
             onTap = { onKeyPress(KeyEvent.KEYCODE_DPAD_RIGHT) }
         )
     }

@@ -51,8 +51,12 @@ class MiniDexAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() {
+        // Not a shutdown. The system calls this to tell a service to stop announcing whatever it
+        // was announcing, and it fires routinely — clearing the instance here left the service
+        // bound and running while every caller believed it was gone, which is what stopped the
+        // pairing panel from floating and the cursor overlay from attaching. Only onDestroy ends
+        // the service's life, so only onDestroy clears it.
         Log.w(TAG, "MiniDex Accessibility Service Interrupted")
-        instance = null
         lastTargetNode = null
     }
 

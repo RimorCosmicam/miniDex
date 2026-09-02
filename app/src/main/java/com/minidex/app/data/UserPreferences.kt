@@ -1,23 +1,20 @@
 package com.minidex.app.data
 
-import com.minidex.app.domain.model.AccentColor
 import com.minidex.app.domain.model.CursorMode
 import com.minidex.app.domain.model.HapticStrength
 import com.minidex.app.domain.model.KeyHeightLevel
-import com.minidex.app.domain.model.ThemeVariant
+import com.minidex.app.domain.model.HalftoneColorway
 import com.minidex.app.domain.model.VisualFilter
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class UserPreferences(
-    val themeVariant: ThemeVariant = ThemeVariant.CYBER_OLED,
-    val accentColor: AccentColor = AccentColor.NEON_CYAN,
+    val colorway: HalftoneColorway = HalftoneColorway.MUSTARD,
     val amoledMode: Boolean = false,
     val visualFilter: VisualFilter = VisualFilter.NONE,
     val hapticStrength: HapticStrength = HapticStrength.CRISP,
     val keyHeightLevel: KeyHeightLevel = KeyHeightLevel.BALANCED,
     val keyGapDp: Int = 4,
-    val cornerRadiusDp: Int = 8,
     val doubleTapToLockModifier: Boolean = true,
     val modifierTimeoutMs: Long = 0L, // 0 = no timeout for latched
     val pointerSensitivity: Float = 1.2f,
@@ -25,6 +22,11 @@ data class UserPreferences(
     val scrollSensitivity: Float = 1.0f,
     val naturalScrolling: Boolean = false,
     val edgeScrollOnRight: Boolean = false,
+    // miniMate's own figures for the edge controls.
+    val edgeScrollEnabled: Boolean = true,
+    val edgeRightClickEnabled: Boolean = true,
+    val edgeRailScale: Float = 1f,
+    val edgeCornerScale: Float = 1f,
     val backgroundGifUri: String = "",
     val backgroundGifScale: Float = 1f,
     val backgroundGifOffsetX: Float = 0f,
@@ -35,5 +37,7 @@ data class UserPreferences(
     val preferredBackend: String = "AUTO", // AUTO, SHIZUKU, VIRTUAL_DEVICE, FALLBACK
     val manualDisplayId: Int = -1, // -1 = auto detect
     val adbAutoConnect: Boolean = true,
-    val adbPort: Int = 5555
+    val adbPort: Int = 5555,
+    val onboardingComplete: Boolean = false,
+    val adbPairedBefore: Boolean = false
 )
