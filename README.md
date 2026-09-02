@@ -35,17 +35,6 @@ reports which are live.
   in. No pairing needed.
 - **Keyboard IME** — types into DeX windows.
 
-## Mont
-
-The whole interface is [Mont](https://github.com/RimorCosmicam/Mont): black at
-92%, white carrying every level of hierarchy through opacity alone, corner
-radius zero, and Mont Black as the default weight rather than an emphasis one.
-No cards, no pills, no gradients, no shadows. Selected is simply the bright one.
-
-The background is one scene — Minimal / Halftone, carried over from
-[miniMate](https://github.com/RimorCosmicam/miniMate) — in sixteen colourways.
-Mustard is the default, because it is the language's poster colour.
-
 ## Building
 
 ```
