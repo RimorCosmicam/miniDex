@@ -57,5 +57,5 @@ swipe to the widget, launch.
 
 Apache 2.0. Do what you like with it (but let me know, I love cool stuff).
 
-The Mont typeface is a commercial face from Fontfabric and is **not** covered by
-that licence — check yours before shipping anything built from this.
+The typeface is [Poppins](https://fonts.google.com/specimen/Poppins), under the
+SIL Open Font License.
