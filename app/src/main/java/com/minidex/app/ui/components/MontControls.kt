@@ -32,7 +32,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.minidex.app.ui.theme.LocalMiniDexColors
-import com.minidex.app.ui.theme.Mont
+import com.minidex.app.ui.theme.Poppins
 
 /**
  * A toggle built from the same rectangle as the slider.
@@ -71,7 +71,7 @@ fun MontToggle(
                 .align(if (checked) Alignment.CenterEnd else Alignment.CenterStart)
                 .width(28.dp),
             color = Color.White.copy(alpha = alpha),
-            fontFamily = Mont,
+            fontFamily = Poppins,
             fontWeight = FontWeight.Black,
             fontSize = 10.sp,
             textAlign = TextAlign.Center,
@@ -160,7 +160,7 @@ fun MontRow(
             Text(
                 text = label.uppercase(),
                 color = colors.textPrimary,
-                fontFamily = Mont,
+                fontFamily = Poppins,
                 fontWeight = FontWeight.Black,
                 fontSize = 14.sp
             )
@@ -168,7 +168,7 @@ fun MontRow(
                 Text(
                     text = status.uppercase(),
                     color = statusColor ?: colors.textSecondary,
-                    fontFamily = Mont,
+                    fontFamily = Poppins,
                     fontWeight = FontWeight.Black,
                     fontSize = 11.sp,
                     letterSpacing = 0.5.sp
@@ -179,7 +179,7 @@ fun MontRow(
             Text(
                 text = explain,
                 color = colors.textExplain,
-                fontFamily = Mont,
+                fontFamily = Poppins,
                 fontWeight = FontWeight.Black,
                 fontSize = 11.sp,
                 letterSpacing = 0.5.sp
@@ -210,7 +210,7 @@ fun MontChip(
             selected -> selectedColor ?: Color.White
             else -> colors.textSecondary
         },
-        fontFamily = Mont,
+        fontFamily = Poppins,
         fontWeight = FontWeight.Black,
         fontSize = 11.sp,
         letterSpacing = 0.5.sp,

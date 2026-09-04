@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.minidex.app.domain.model.KeyboardPage
 import com.minidex.app.ui.theme.LocalMiniDexColors
-import com.minidex.app.ui.theme.Mont
+import com.minidex.app.ui.theme.Poppins
 
 /**
  * The page row. Selected is simply the bright one — no fill, no border, no underline.
@@ -58,7 +58,7 @@ fun PageBar(
                 Text(
                     text = page.title,
                     color = if (isSelected) androidx.compose.ui.graphics.Color.White else colors.textSecondary,
-                    fontFamily = Mont,
+                    fontFamily = Poppins,
                     fontWeight = FontWeight.Black,
                     fontSize = 10.sp,
                     letterSpacing = 0.5.sp

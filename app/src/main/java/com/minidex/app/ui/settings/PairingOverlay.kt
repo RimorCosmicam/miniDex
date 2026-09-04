@@ -46,7 +46,7 @@ import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.minidex.app.input.accessibility.MiniDexAccessibilityService
 import com.minidex.app.ui.theme.MontSurface
-import com.minidex.app.ui.theme.Mont
+import com.minidex.app.ui.theme.Poppins
 
 /**
  * The pairing panel, floated over whatever is on the cover screen.
@@ -199,7 +199,7 @@ fun PairingPanel(
         Text(
             text = statusMessage.uppercase(),
             color = Color.White.copy(alpha = 0.62f),
-            fontFamily = Mont,
+            fontFamily = Poppins,
             fontWeight = FontWeight.Black,
             fontSize = 9.sp,
             letterSpacing = 0.5.sp,
@@ -225,7 +225,7 @@ fun PairingPanel(
             Text(
                 text = "PAIR",
                 color = if (canPair) Color.White else Color.White.copy(alpha = 0.35f),
-                fontFamily = Mont,
+                fontFamily = Poppins,
                 fontWeight = FontWeight.Black,
                 fontSize = 14.sp,
                 modifier = Modifier
@@ -235,7 +235,7 @@ fun PairingPanel(
             Text(
                 text = "CLOSE",
                 color = Color.White.copy(alpha = 0.58f),
-                fontFamily = Mont,
+                fontFamily = Poppins,
                 fontWeight = FontWeight.Black,
                 fontSize = 11.sp,
                 letterSpacing = 0.5.sp,
@@ -271,7 +271,7 @@ private fun Field(
             singleLine = true,
             textStyle = TextStyle(
                 color = Color.Black,
-                fontFamily = Mont,
+                fontFamily = Poppins,
                 fontWeight = FontWeight.Black,
                 fontSize = 15.sp,
                 letterSpacing = 2.sp
@@ -284,7 +284,7 @@ private fun Field(
             Text(
                 text = placeholder,
                 color = Color.Black.copy(alpha = 0.35f),
-                fontFamily = Mont,
+                fontFamily = Poppins,
                 fontWeight = FontWeight.Black,
                 fontSize = 11.sp,
                 letterSpacing = 0.5.sp

@@ -46,7 +46,7 @@ import androidx.compose.ui.unit.sp
 import com.minidex.app.ui.components.DiagonalStripes
 import com.minidex.app.ui.theme.MONT_SURFACE_ALPHA
 import com.minidex.app.ui.theme.MontMustard
-import com.minidex.app.ui.theme.Mont
+import com.minidex.app.ui.theme.Poppins
 
 /** One thing the app needs, and whether it has it yet. */
 data class PermissionItem(
@@ -129,14 +129,14 @@ fun Welcome(
             Text(
                 "mini",
                 color = Color.White,
-                fontFamily = Mont,
+                fontFamily = Poppins,
                 fontWeight = FontWeight.Thin,
                 fontSize = 36.sp
             )
             Text(
                 "Dex",
                 color = Color.White,
-                fontFamily = Mont,
+                fontFamily = Poppins,
                 fontWeight = FontWeight.Black,
                 fontSize = 36.sp
             )
@@ -188,7 +188,7 @@ private fun ColumnScope.DriversStep(
                         .clickable(onClick = item.onShortcut)
                         .padding(horizontal = 10.dp, vertical = 4.dp),
                     color = if (item.shortcutFailed) Color(0xFFC0392B) else Color.White,
-                    fontFamily = Mont,
+                    fontFamily = Poppins,
                     fontWeight = FontWeight.Black,
                     fontSize = 11.sp
                 )
@@ -207,7 +207,7 @@ private fun ColumnScope.DriversStep(
             .clickable(enabled = everythingGranted, onClick = onDone)
             .padding(vertical = 6.dp),
         color = Color.White.copy(alpha = if (everythingGranted) 1f else 0.30f),
-        fontFamily = Mont,
+        fontFamily = Poppins,
         fontWeight = FontWeight.Black,
         fontSize = 15.sp
     )
@@ -225,7 +225,7 @@ private fun ColumnScope.SwitcherStep(onOkay: () -> Unit) {
         "OKAY",
         modifier = Modifier.fillMaxWidth().clickable(onClick = onOkay).padding(vertical = 6.dp),
         color = Color.White,
-        fontFamily = Mont,
+        fontFamily = Poppins,
         fontWeight = FontWeight.Black,
         fontSize = 15.sp
     )
@@ -246,7 +246,7 @@ private fun FakePill() {
         Text(
             "9:41",
             color = Color.White.copy(alpha = 0.92f),
-            fontFamily = Mont,
+            fontFamily = Poppins,
             fontWeight = FontWeight.Black,
             fontSize = 13.sp
         )
@@ -254,7 +254,7 @@ private fun FakePill() {
         Text(
             "PM",
             color = Color(0xFFFF69B4),
-            fontFamily = Mont,
+            fontFamily = Poppins,
             fontWeight = FontWeight.Black,
             fontSize = 9.sp
         )
@@ -269,7 +269,7 @@ private fun FakePill() {
         Text(
             "84%",
             color = Color.White.copy(alpha = 0.92f),
-            fontFamily = Mont,
+            fontFamily = Poppins,
             fontWeight = FontWeight.Black,
             fontSize = 10.sp
         )
@@ -285,7 +285,7 @@ private fun TourLine(gesture: String, meaning: String) {
             gesture,
             modifier = Modifier.weight(0.42f),
             color = Color.White,
-            fontFamily = Mont,
+            fontFamily = Poppins,
             fontWeight = FontWeight.Black,
             fontSize = 12.sp
         )
@@ -293,7 +293,7 @@ private fun TourLine(gesture: String, meaning: String) {
             meaning,
             modifier = Modifier.weight(0.58f),
             color = Color.White.copy(alpha = 0.62f),
-            fontFamily = Mont,
+            fontFamily = Poppins,
             fontWeight = FontWeight.Normal,
             fontSize = 11.sp
         )
@@ -305,7 +305,7 @@ private fun Label(text: String, alpha: Float, size: Int) {
     Text(
         text,
         color = Color.White.copy(alpha = alpha),
-        fontFamily = Mont,
+        fontFamily = Poppins,
         fontWeight = FontWeight.Black,
         fontSize = size.sp
     )
@@ -316,7 +316,7 @@ private fun Detail(text: String) {
     Text(
         text,
         color = Color.White.copy(alpha = 0.42f),
-        fontFamily = Mont,
+        fontFamily = Poppins,
         fontWeight = FontWeight.Normal,
         fontSize = 9.sp
     )

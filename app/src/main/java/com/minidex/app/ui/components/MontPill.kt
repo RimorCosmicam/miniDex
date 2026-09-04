@@ -32,7 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.minidex.app.ui.theme.MONT_SURFACE_ALPHA
-import com.minidex.app.ui.theme.Mont
+import com.minidex.app.ui.theme.Poppins
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -50,7 +50,7 @@ private val LowBattery = Color(0xFFEF4444)
 /**
  * miniMate's clock pill.
  *
- * Square, black, Mont Black, no border and no accent colours — the same surface as every panel, so
+ * Square, black, Poppins Black, no border and no accent colours — the same surface as every panel, so
  * the pill stops being the one ornamented thing left on the screen. It sits at the lower left of
  * the cover display: clear of the camera, and under the thumb.
  *
@@ -118,7 +118,7 @@ fun MontPill(
         Text(
             text = time,
             color = Color.White.copy(alpha = if (pressed) 1f else 0.92f),
-            fontFamily = Mont,
+            fontFamily = Poppins,
             fontWeight = FontWeight.Black,
             fontSize = 13.sp
         )
@@ -129,7 +129,7 @@ fun MontPill(
                 // Colour everywhere except AMOLED, where the point is that nothing lights a pixel
                 // it does not have to.
                 color = if (isAmoled) Color.White.copy(alpha = 0.55f) else AccentPink,
-                fontFamily = Mont,
+                fontFamily = Poppins,
                 fontWeight = FontWeight.Black,
                 fontSize = 9.sp
             )
@@ -142,7 +142,7 @@ fun MontPill(
                 battery < 20 -> LowBattery
                 else -> AccentEmerald
             },
-            fontFamily = Mont,
+            fontFamily = Poppins,
             fontWeight = FontWeight.Black,
             fontSize = 10.sp
         )

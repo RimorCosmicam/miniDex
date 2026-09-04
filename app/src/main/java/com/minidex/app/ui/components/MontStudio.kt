@@ -21,13 +21,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.minidex.app.ui.theme.MontSurface
-import com.minidex.app.ui.theme.Mont
+import com.minidex.app.ui.theme.Poppins
 
 /**
  * The studio chrome, set the same way as the command bar in miniMate.
  *
  * Everything the old chrome used to say with decoration — rounded cards, gradients, hairlines,
- * shadows, icon buttons in circles — the type says on its own. A studio is black, Mont Black,
+ * shadows, icon buttons in circles — the type says on its own. A studio is black, Poppins Black,
  * white, and the selected thing is simply the bright one.
  */
 private val StudioWeight = FontWeight.Black
@@ -93,7 +93,7 @@ fun StudioRow(
                 Text(
                     trailing,
                     color = trailingColor ?: Color.White.copy(alpha = 0.58f),
-                    fontFamily = Mont,
+                    fontFamily = Poppins,
                     fontWeight = StudioWeight,
                     fontSize = 11.sp,
                     letterSpacing = 0.5.sp,
@@ -134,7 +134,7 @@ fun StudioLabel(
         text,
         modifier = modifier,
         color = if (dim) Color.White.copy(alpha = 0.58f) else Color.White,
-        fontFamily = Mont,
+        fontFamily = Poppins,
         fontWeight = StudioWeight,
         fontSize = size.sp,
         maxLines = 1
@@ -148,7 +148,7 @@ fun StudioDetail(text: String, modifier: Modifier = Modifier) {
         text,
         modifier = modifier,
         color = Color.White.copy(alpha = 0.62f),
-        fontFamily = Mont,
+        fontFamily = Poppins,
         fontWeight = StudioWeight,
         fontSize = 11.sp,
         letterSpacing = 0.5.sp

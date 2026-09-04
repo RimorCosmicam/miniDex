@@ -44,7 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.minidex.app.domain.model.Macro
 import com.minidex.app.ui.theme.LocalMiniDexColors
-import com.minidex.app.ui.theme.Mont
+import com.minidex.app.ui.theme.Poppins
 
 @Composable
 fun MacropadView(
@@ -92,7 +92,7 @@ fun MacropadView(
                         Text(
                             text = "NEW MACRO",
                             color = colors.textSecondary,
-                            fontFamily = Mont,
+                            fontFamily = Poppins,
                             fontWeight = FontWeight.Black,
                             fontSize = 8.sp,
                             letterSpacing = 0.5.sp
@@ -157,7 +157,7 @@ fun MacroGridItem(
                 Text(
                     text = macro.name.uppercase(),
                     color = colors.textPrimary,
-                    fontFamily = Mont,
+                    fontFamily = Poppins,
                     fontWeight = FontWeight.Black,
                     fontSize = 10.sp,
                     maxLines = 1
@@ -168,7 +168,7 @@ fun MacroGridItem(
                 Text(
                     text = macro.description,
                     color = colors.textExplain,
-                    fontFamily = Mont,
+                    fontFamily = Poppins,
                     fontWeight = FontWeight.Black,
                     fontSize = 7.sp,
                     maxLines = 1,

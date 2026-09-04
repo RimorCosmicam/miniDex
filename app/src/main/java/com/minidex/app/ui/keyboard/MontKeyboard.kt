@@ -46,7 +46,7 @@ import com.minidex.app.domain.model.ModifierLockState
 import com.minidex.app.domain.model.ModifierState
 import com.minidex.app.domain.model.ModifierType
 import com.minidex.app.ui.theme.MONT_SURFACE_ALPHA
-import com.minidex.app.ui.theme.Mont
+import com.minidex.app.ui.theme.Poppins
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -207,7 +207,7 @@ fun MontKeyboard(
     }
 
     val typeface = remember {
-        runCatching { ResourcesCompat.getFont(context, R.font.mont_black) }.getOrNull()
+        runCatching { ResourcesCompat.getFont(context, R.font.poppins_black) }.getOrNull()
             ?: android.graphics.Typeface.DEFAULT_BOLD
     }
 
@@ -395,7 +395,7 @@ fun MontKeyboard(
                 androidx.compose.material3.Text(
                     text = preview.uppercase(),
                     color = Color.Black,
-                    fontFamily = Mont,
+                    fontFamily = Poppins,
                     fontWeight = FontWeight.Black,
                     fontSize = 11.sp,
                     letterSpacing = 0.5.sp,
@@ -482,7 +482,7 @@ private fun RowScope.MontRowKey(
         androidx.compose.material3.Text(
             text = label,
             color = Color.White,
-            fontFamily = Mont,
+            fontFamily = Poppins,
             fontWeight = FontWeight.Black,
             fontSize = 12.sp
         )

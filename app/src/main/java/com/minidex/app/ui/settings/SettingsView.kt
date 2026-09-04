@@ -43,7 +43,7 @@ import com.minidex.app.ui.components.StudioChip
 import com.minidex.app.ui.components.StudioPanel
 import com.minidex.app.ui.components.StudioRow
 import com.minidex.app.ui.theme.GifCropExporter
-import com.minidex.app.ui.theme.Mont
+import com.minidex.app.ui.theme.Poppins
 import com.minidex.app.ui.theme.ground
 import com.minidex.app.ui.theme.ink
 import kotlinx.coroutines.launch
@@ -284,7 +284,7 @@ private fun SliderLine(
         Text(
             label.uppercase(),
             color = Color.White.copy(alpha = 0.7f),
-            fontFamily = Mont,
+            fontFamily = Poppins,
             fontWeight = FontWeight.Black,
             fontSize = 9.sp,
             modifier = Modifier.width(62.dp)
@@ -304,7 +304,7 @@ private fun ToggleLine(label: String, checked: Boolean, onChange: (Boolean) -> U
         Text(
             label.uppercase(),
             color = Color.White.copy(alpha = 0.7f),
-            fontFamily = Mont,
+            fontFamily = Poppins,
             fontWeight = FontWeight.Black,
             fontSize = 9.sp,
             modifier = Modifier.width(62.dp)

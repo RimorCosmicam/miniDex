@@ -39,7 +39,7 @@ import com.minidex.app.domain.model.ModifierLockState
 import com.minidex.app.domain.model.ModifierType
 import com.minidex.app.ui.components.KeyButton
 import com.minidex.app.ui.theme.LocalMiniDexColors
-import com.minidex.app.ui.theme.Mont
+import com.minidex.app.ui.theme.Poppins
 
 @Composable
 fun MacroEditorDialog(
@@ -102,7 +102,7 @@ fun MacroEditorDialog(
                         focusedTextColor = colors.textPrimary,
                         unfocusedTextColor = colors.textPrimary
                     ),
-                    textStyle = TextStyle(fontFamily = Mont, fontWeight = FontWeight.Black, fontSize = 11.sp),
+                    textStyle = TextStyle(fontFamily = Poppins, fontWeight = FontWeight.Black, fontSize = 11.sp),
                     modifier = Modifier.fillMaxWidth().height(48.dp)
                 )
 
@@ -123,7 +123,7 @@ fun MacroEditorDialog(
                     Text(
                         text = chordLabel.ifEmpty { "TAP MODIFIERS, THEN A KEY" },
                         color = if (chordLabel.isEmpty()) colors.textExplain else Color.White,
-                        fontFamily = Mont,
+                        fontFamily = Poppins,
                         fontWeight = FontWeight.Black,
                         fontSize = 11.sp,
                         letterSpacing = 0.5.sp
@@ -182,7 +182,7 @@ fun MacroEditorDialog(
                             focusedTextColor = colors.textPrimary,
                             unfocusedTextColor = colors.textPrimary
                         ),
-                        textStyle = TextStyle(fontFamily = Mont, fontWeight = FontWeight.Black, fontSize = 11.sp),
+                        textStyle = TextStyle(fontFamily = Poppins, fontWeight = FontWeight.Black, fontSize = 11.sp),
                         modifier = Modifier.fillMaxWidth().height(48.dp)
                     )
                 }
@@ -199,7 +199,7 @@ fun MacroEditorDialog(
                         Text(
                             text = "CANCEL",
                             color = colors.textSecondary,
-                            fontFamily = Mont,
+                            fontFamily = Poppins,
                             fontWeight = FontWeight.Black,
                             fontSize = 14.sp
                         )
@@ -247,7 +247,7 @@ fun MacroEditorDialog(
                         Text(
                             text = "DONE",
                             color = Color.White,
-                            fontFamily = Mont,
+                            fontFamily = Poppins,
                             fontWeight = FontWeight.Black,
                             fontSize = 14.sp
                         )
@@ -273,7 +273,7 @@ private fun MacroTypePill(
         Text(
             text = label,
             color = if (selected) Color.White else colors.textSecondary,
-            fontFamily = Mont,
+            fontFamily = Poppins,
             fontWeight = FontWeight.Black,
             fontSize = 11.sp,
             letterSpacing = 0.5.sp

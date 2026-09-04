@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.minidex.app.domain.model.ModifierLockState
 import com.minidex.app.ui.theme.LocalMiniDexColors
-import com.minidex.app.ui.theme.Mont
+import com.minidex.app.ui.theme.Poppins
 
 /**
  * A key under Mont: 92% black, square, borderless.
@@ -105,7 +105,7 @@ fun KeyButton(
                 Text(
                     text = if (isLocked) "LOCK" else "ON",
                     color = if (isLocked) colors.accent else Color.White,
-                    fontFamily = Mont,
+                    fontFamily = Poppins,
                     fontWeight = FontWeight.Black,
                     fontSize = 7.sp,
                     lineHeight = 8.sp,
@@ -115,7 +115,7 @@ fun KeyButton(
                 Text(
                     text = shiftLabel,
                     color = colors.textSecondary,
-                    fontFamily = Mont,
+                    fontFamily = Poppins,
                     fontWeight = FontWeight.Black,
                     fontSize = 8.sp,
                     lineHeight = 9.sp
@@ -125,7 +125,7 @@ fun KeyButton(
             Text(
                 text = label,
                 color = textColor,
-                fontFamily = Mont,
+                fontFamily = Poppins,
                 fontWeight = FontWeight.Black,
                 fontSize = if (label.length > 2) 11.sp else 14.sp,
                 lineHeight = 15.sp
@@ -135,7 +135,7 @@ fun KeyButton(
                 Text(
                     text = subLabel,
                     color = colors.textSecondary,
-                    fontFamily = Mont,
+                    fontFamily = Poppins,
                     fontWeight = FontWeight.Black,
                     fontSize = 7.sp,
                     lineHeight = 8.sp

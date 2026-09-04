@@ -47,7 +47,7 @@ import com.minidex.app.ui.theme.LocalMiniDexColors
 import com.minidex.app.ui.theme.AnimatedGifBackground
 import com.minidex.app.ui.theme.HalftoneBackground
 import com.minidex.app.ui.theme.MiniDexTheme
-import com.minidex.app.ui.theme.Mont
+import com.minidex.app.ui.theme.Poppins
 import androidx.compose.ui.graphics.luminance
 import com.minidex.app.ui.touchpad.EdgeControls
 import com.minidex.app.ui.touchpad.EdgeRefractionSurface
